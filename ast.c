@@ -13,9 +13,9 @@ struct def_exprs *make_def_exprs(struct def_expr *def_expr) {
 }
 
 struct def_exprs *append_def_exprs(struct def_exprs *left,
-                                   struct def_exprs *right) {
+                                   struct def_expr *def_expr) {
   assert(left != NULL);
-  assert(right != NULL);
+  struct def_exprs *right = make_def_exprs(def_expr);
   walk_to_last(struct def_exprs, left, {
     assert(last != NULL);
     last->next = right;
@@ -190,10 +190,9 @@ struct call_args *make_call_args(struct expr *expr) {
   return call_args;
 }
 
-struct call_args *append_call_args(struct call_args *left,
-                                   struct call_args *right) {
+struct call_args *append_call_args(struct call_args *left, struct expr *expr) {
   assert(left != NULL);
-  assert(right != NULL);
+  struct call_args *right = make_call_args(expr);
   walk_to_last(struct call_args, left, {
     assert(last != NULL);
     last->next = right;
@@ -244,10 +243,10 @@ struct let_assigns *make_let_assigns(char *id, struct expr *expr) {
   return let_assigns;
 }
 
-struct let_assigns *append_let_assigns(struct let_assigns *left,
-                                       struct let_assigns *right) {
+struct let_assigns *append_let_assigns(struct let_assigns *left, char *id,
+                                       struct expr *expr) {
   assert(left != NULL);
-  assert(right != NULL);
+  struct let_assigns *right = make_let_assigns(id, expr);
   walk_to_last(struct let_assigns, left, {
     assert(last != NULL);
     last->next = right;
@@ -307,10 +306,9 @@ struct def_params *make_def_params(char *id) {
   return def_params;
 }
 
-struct def_params *append_def_params(struct def_params *left,
-                                     struct def_params *right) {
+struct def_params *append_def_params(struct def_params *left, char *id) {
   assert(left != NULL);
-  assert(right != NULL);
+  struct def_params *right = make_def_params(id);
   walk_to_last(struct def_params, left, {
     assert(last != NULL);
     last->next = right;
@@ -404,10 +402,9 @@ struct for_handles *make_for_handles(char *id) {
   return for_handles;
 }
 
-struct for_handles *append_for_handles(struct for_handles *left,
-                                       struct for_handles *right) {
+struct for_handles *append_for_handles(struct for_handles *left, char *id) {
   assert(left != NULL);
-  assert(right != NULL);
+  struct for_handles *right = make_for_handles(id);
   walk_to_last(struct for_handles, left, {
     assert(last != NULL);
     last->next = right;
