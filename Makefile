@@ -1,7 +1,7 @@
 CC 	= cc
 CFLAGS 	= -std=c11 -I. -I/usr/include
-HEADERS	=
-OBJ 	= y.tab.o lex.yy.o
+HEADERS	= ast.h
+OBJ 	= ast.o y.tab.o lex.yy.o
 YACC 	= bison
 YFLAGS 	= -y -d
 LEX 	= lex

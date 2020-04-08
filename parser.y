@@ -7,7 +7,7 @@ int yyerror(char *s);
 char *strval;
 %}
 
-%start program
+%start def_exprs
 %token T_ID T_STRING T_NUMBER
 %token T_ASSIGN T_LPAR T_RPAR T_COMMA T_COLON T_DOT
 %token T_ADD T_SUB T_MUL T_DIV T_MOD
@@ -26,9 +26,9 @@ char *strval;
 %left T_DEF
 %%
 
-program: def_expr
-       | program def_expr
-       ;
+def_exprs: def_expr
+         | def_exprs def_expr
+         ;
 
 id: T_ID
 
@@ -61,9 +61,8 @@ call_args: %empty
 
 call_expr: id T_LPAR call_args T_RPAR
 
-let_assign: id T_ASSIGN expr
-let_assigns: let_assign
-           | let_assigns T_COMMA let_assign
+let_assigns: id T_ASSIGN expr
+           | let_assigns T_COMMA id T_ASSIGN expr
            ;
 
 let_expr: T_LET let_assigns T_IN expr
@@ -77,7 +76,11 @@ def_expr: T_DEF id T_LPAR def_params T_RPAR T_ASSIGN expr
 
 if_expr: expr T_IF expr T_ELSE expr
 
-for_expr: expr T_FOR expr T_IN expr
+for_handles: id
+           | for_handles T_COMMA id
+           ;
+
+for_expr: expr T_FOR for_handles T_IN expr
 
 %%
 int main() {
