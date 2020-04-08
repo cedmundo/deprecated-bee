@@ -1,0 +1,5 @@
+bin
+*.obj
+*.o
+lex.yy.c
+y.tab.*
