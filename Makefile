@@ -1,5 +1,5 @@
 CC 	= cc
-CFLAGS 	= -std=c11 -I. -I/usr/include
+CFLAGS 	= -Wall -std=c11 -I. -I/usr/include
 HEADERS	= ast.h
 OBJ 	= ast.o y.tab.o lex.yy.o
 YACC 	= bison

@@ -5,6 +5,8 @@ int fileno(FILE *stream);
 extern char* strval;
 %}
 
+%option nounput
+%option noinput
 %%
 " "         ;
 "\n"        ;

@@ -7,13 +7,11 @@ extern int yylex();
 int yyerror(char *s);
 char *strval;
 %}
-
 %start def_exprs
 %token T_ID T_STRING T_NUMBER
 %token T_ASSIGN T_LPAR T_RPAR T_COMMA T_COLON T_DOT
 %token T_ADD T_SUB T_MUL T_DIV T_MOD
 %token T_DEF T_LET T_FOR T_IN T_IF T_ELSE
-
 
 %union {
   int token;
