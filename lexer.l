@@ -37,7 +37,7 @@ extern char* strval;
   return T_STRING;
 }
 
-\-?(0x|0b|0o)?[0-9ABCDEF]+(\.[0-9ABCDEF]+)?(u32|u64|i32|i64|f32|f64)? {
+\-?[0-9ABCDEF]+(\.[0-9ABCDEF]+)? {
   strval = yytext;
   return T_NUMBER;
 }
