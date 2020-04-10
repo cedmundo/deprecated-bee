@@ -13,8 +13,20 @@ extern char* strval;
 "\n"        ;
 "\t"        ;
 "="         { return T_ASSIGN; }
+"=="        { return T_EQ; }
+"!="        { return T_NEQ; }
+">"         { return T_GT; }
+">="        { return T_GE; }
+"<"         { return T_LT; }
+"<="        { return T_LE; }
 "("         { return T_LPAR; }
 ")"         { return T_RPAR; }
+"&"         { return T_AND; }
+"&&"        { return T_ANDS; }
+"|"         { return T_OR; }
+"||"        { return T_ORS; }
+"^"         { return T_XOR; }
+"!"         { return T_NOT; }
 "+"         { return T_ADD; }
 "-"         { return T_SUB; }
 "*"         { return T_MUL; }

@@ -17,6 +17,8 @@ int yyerror(struct scope *scope, char *s);
 %start program
 %token T_ID T_STRING T_NUMBER
 %token T_ASSIGN T_LPAR T_RPAR T_COMMA T_COLON T_DOT
+%token T_EQ T_NEQ T_GT T_GE T_LT T_LE
+%token T_ANDS T_ORS T_AND T_OR T_XOR T_NOT
 %token T_ADD T_SUB T_MUL T_DIV T_MOD
 %token T_DEF T_LET T_FOR T_IN T_IF T_ELSE
 
@@ -62,6 +64,8 @@ int yyerror(struct scope *scope, char *s);
 %left T_COMMA
 %left T_LET
 %left T_FOR T_IF T_ELSE
+%left T_EQ T_NEQ T_LT T_LE T_GT T_GE
+%left T_ANDS T_ORS T_AND T_OR T_XOR T_NOT
 %left T_ADD T_SUB
 %left T_MUL T_DIV T_MOD
 %left T_DOT
@@ -95,11 +99,22 @@ lit_expr: T_NUMBER { $$ = make_lit_expr(LIT_NUMBER, strdup(strval)); }
 
 lookup_expr: id { $$ = make_lookup_expr($1); }
 
-bin_expr: expr T_ADD expr { $$ = make_bin_expr($1, $3, OP_ADD); }
-        | expr T_SUB expr { $$ = make_bin_expr($1, $3, OP_SUB); }
-        | expr T_MUL expr { $$ = make_bin_expr($1, $3, OP_MUL); }
-        | expr T_DIV expr { $$ = make_bin_expr($1, $3, OP_DIV); }
-        | expr T_MOD expr { $$ = make_bin_expr($1, $3, OP_MOD); }
+bin_expr: expr T_ADD expr  { $$ = make_bin_expr($1, $3, OP_ADD); }
+        | expr T_SUB expr  { $$ = make_bin_expr($1, $3, OP_SUB); }
+        | expr T_MUL expr  { $$ = make_bin_expr($1, $3, OP_MUL); }
+        | expr T_DIV expr  { $$ = make_bin_expr($1, $3, OP_DIV); }
+        | expr T_MOD expr  { $$ = make_bin_expr($1, $3, OP_MOD); }
+        | expr T_ANDS expr { $$ = make_bin_expr($1, $3, OP_ANDS); }
+        | expr T_ORS expr  { $$ = make_bin_expr($1, $3, OP_ORS); }
+        | expr T_AND expr  { $$ = make_bin_expr($1, $3, OP_AND); }
+        | expr T_OR expr   { $$ = make_bin_expr($1, $3, OP_OR); }
+        | expr T_XOR expr  { $$ = make_bin_expr($1, $3, OP_XOR); }
+        | expr T_EQ expr   { $$ = make_bin_expr($1, $3, OP_EQ); }
+        | expr T_NEQ expr  { $$ = make_bin_expr($1, $3, OP_NEQ); }
+        | expr T_LT expr   { $$ = make_bin_expr($1, $3, OP_LT); }
+        | expr T_LE expr   { $$ = make_bin_expr($1, $3, OP_LE); }
+        | expr T_GT expr   { $$ = make_bin_expr($1, $3, OP_GT); }
+        | expr T_GE expr   { $$ = make_bin_expr($1, $3, OP_GE); }
         ;
 
 call_args: %empty                   { $$ = NULL; }

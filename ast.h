@@ -54,7 +54,24 @@ struct lookup_expr {
   char *id;
 };
 
-enum bin_op { OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_MOD };
+enum bin_op {
+  OP_ADD,
+  OP_SUB,
+  OP_MUL,
+  OP_DIV,
+  OP_MOD,
+  OP_ANDS,
+  OP_AND,
+  OP_ORS,
+  OP_OR,
+  OP_XOR,
+  OP_EQ,
+  OP_NEQ,
+  OP_LT,
+  OP_LE,
+  OP_GT,
+  OP_GE
+};
 struct bin_expr {
   struct expr *left;
   struct expr *right;

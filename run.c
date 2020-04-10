@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include "run.h"
+#include "binops.h"
 #include "builtins.h"
 #include <assert.h>
 #include <iconv.h>
@@ -17,8 +18,16 @@ struct value run_lit_expr(struct scope *scope, struct lit_expr *lit_expr) {
     size_t quoted_size = strlen(lit_expr->raw_value);
     res.str = strndup(lit_expr->raw_value + 1, quoted_size - 2);
   } else {
-    res.type = TYPE_NUMBER;
-    res.num = strtod(lit_expr->raw_value, NULL);
+    if (strstr(lit_expr->raw_value, ".") != NULL) {
+      res.type = TYPE_F64;
+      res.f64 = strtod(lit_expr->raw_value, NULL);
+    } else if (strstr(lit_expr->raw_value, "-") != NULL) {
+      res.type = TYPE_I64;
+      res.i64 = strtol(lit_expr->raw_value, NULL, 10);
+    } else {
+      res.type = TYPE_U64;
+      res.u64 = strtoul(lit_expr->raw_value, NULL, 10);
+    }
   }
   return res;
 }
@@ -40,45 +49,10 @@ struct value run_lookup_expr(struct scope *scope,
 struct value run_bin_expr(struct scope *scope, struct bin_expr *bin_expr) {
   assert(scope != NULL);
   assert(bin_expr != NULL);
-
-  struct value res;
   struct value left_value = run_expr(scope, bin_expr->left);
   struct value right_value = run_expr(scope, bin_expr->right);
 
-  if (left_value.type == TYPE_NUMBER && right_value.type == TYPE_NUMBER) {
-    res.type = TYPE_NUMBER;
-    switch (bin_expr->op) {
-    case OP_ADD:
-      res.num = left_value.num + right_value.num;
-      break;
-    case OP_SUB:
-      res.num = left_value.num - right_value.num;
-      break;
-    case OP_MUL:
-      res.num = left_value.num * right_value.num;
-      break;
-    case OP_DIV:
-      res.num = left_value.num / right_value.num;
-      break;
-    case OP_MOD:
-      res.num = ((long)left_value.num) % ((long)right_value.num);
-      break;
-    }
-  } else if (left_value.type == TYPE_STRING &&
-             right_value.type == TYPE_STRING && bin_expr->op == OP_ADD) {
-    res.type = TYPE_STRING;
-    size_t left_size = strlen(left_value.str);
-    size_t right_size = strlen(right_value.str);
-    size_t new_size = left_size + right_size + 1;
-    res.str = malloc(new_size);
-    memset(res.str, 0L, new_size);
-    sprintf(res.str, "%s%s", left_value.str, right_value.str);
-  } else {
-    make_error(res, "error: incompatible operation between string and number");
-  }
-
-  free_value(&left_value);
-  free_value(&right_value);
+  struct value res = handle_bin_op(left_value, right_value, bin_expr->op);
   return res;
 }
 
@@ -182,8 +156,7 @@ struct value run_if_expr(struct scope *scope, struct if_expr *if_expr) {
     return res;
   }
 
-  if ((cond_value.type == TYPE_NUMBER && ((long long)cond_value.num)) ||
-      (cond_value.type == TYPE_STRING && cond_value.str != NULL)) {
+  if (cond_value.u64) {
     res = run_expr(scope, if_expr->then_expr);
   } else {
     res = run_expr(scope, if_expr->else_expr);
@@ -249,8 +222,14 @@ void run_main(struct scope *scope) {
   case TYPE_FUNCTION:
     printf("success [function]\n");
     break;
-  case TYPE_NUMBER:
-    printf("success [number] %lf\n", final_value.num);
+  case TYPE_U64:
+    printf("success [u64] %lu\n", final_value.u64);
+    break;
+  case TYPE_I64:
+    printf("success [i64] %lu\n", final_value.i64);
+    break;
+  case TYPE_F64:
+    printf("success [f64] %lf\n", final_value.f64);
     break;
   case TYPE_STRING:
     printf("success [string] %s\n", final_value.str);
@@ -272,7 +251,8 @@ void run_all_def_exprs(struct scope *scope, struct def_exprs *def_exprs) {
 }
 
 void free_value(struct value *value) {
-  if (value->type == TYPE_NUMBER || value->type == TYPE_UNIT) {
+  if (value->type == TYPE_F64 || value->type == TYPE_I64 ||
+      value->type == TYPE_U64 || value->type == TYPE_UNIT) {
     return;
   }
 
@@ -316,6 +296,8 @@ void scope_bind(struct scope *scope, const char *id, struct value value) {
   assert(scope != NULL);
   assert(id != NULL);
   struct bind *new_bind = malloc(sizeof(struct bind));
+  assert(new_bind != NULL);
+
   new_bind->id = strdup(id);
   new_bind->value = value;
   new_bind->next = NULL;
@@ -353,6 +335,8 @@ struct bind *scope_resolve(struct scope *scope, const char *id) {
 
 struct scope *scope_builtins(struct scope *scope) {
   struct function *fun = malloc(sizeof(struct function));
+  assert(fun != NULL);
+
   fun->type = FUN_NATIVE;
   fun->nat_ref = &wrapper_puts;
 

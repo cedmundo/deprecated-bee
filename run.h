@@ -1,5 +1,6 @@
 #pragma once
 #include "ast.h"
+#include <stdint.h>
 
 struct value;
 struct bind;
@@ -7,16 +8,20 @@ struct scope;
 struct function;
 
 enum type {
-  TYPE_UNIT,
-  TYPE_FUNCTION,
-  TYPE_STRING,
-  TYPE_NUMBER,
-  TYPE_ERROR,
+  TYPE_UNIT = 1,
+  TYPE_FUNCTION = 2,
+  TYPE_STRING = 4,
+  TYPE_I64 = 8,
+  TYPE_U64 = 16,
+  TYPE_F64 = 32,
+  TYPE_ERROR = 64,
 };
 struct value {
   union {
     struct function *fun;
-    double num;
+    uint64_t u64;
+    int64_t i64;
+    double f64;
     char *str;
   };
   enum type type;
