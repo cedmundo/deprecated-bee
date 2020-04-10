@@ -7,13 +7,11 @@ programming language, the idea it's to incrementally add new features and make a
 
 * Read scripts from stdin.
 * Function and variable binding/definition.
-* Basic arithmetic (add, sub, mul, div).
+* Basic arithmetic (add, sub, mul, div), bit (and, or, xor) and comparision (eq, neq, gt, ...).
 * If-else conditions.
 
 ## Work in progress
 
-* Bit and boolean operators.
-* Comparision operators.
 * Bultin functions.
 * Collections.
 * Dictionaries.
