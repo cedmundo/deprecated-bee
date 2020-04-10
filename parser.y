@@ -1,13 +1,20 @@
 %{
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <string.h>
+
+struct scope;
 #include "y.tab.h"
 #include "ast.h"
+#include "run.h"
+
 extern int yylex();
-int yyerror(char *s);
 char *strval;
+int yyerror(struct scope *scope, char *s);
 %}
-%start def_exprs
+%start program
 %token T_ID T_STRING T_NUMBER
 %token T_ASSIGN T_LPAR T_RPAR T_COMMA T_COLON T_DOT
 %token T_ADD T_SUB T_MUL T_DIV T_MOD
@@ -48,6 +55,8 @@ char *strval;
 %type<for_handles> for_handles
 %type<for_expr> for_expr
 
+%parse-param {struct scope *scope}
+
 %right T_ASSIGN
 %right T_IN
 %left T_COMMA
@@ -61,11 +70,13 @@ char *strval;
 %left T_DEF
 %%
 
+program: def_exprs { run_all_def_exprs(scope, $1); }
+
 def_exprs: def_expr             { $$ = make_def_exprs($1); }
          | def_exprs def_expr   { $$ = append_def_exprs($1, $2); }
          ;
 
-id: T_ID { $$ = strval; }
+id: T_ID { $$ = strdup(strval); }
 
 expr: T_LPAR expr T_RPAR  { $$ = $2; }
     | lit_expr            { $$ = make_expr_from_lit($1); }
@@ -78,8 +89,8 @@ expr: T_LPAR expr T_RPAR  { $$ = $2; }
     | for_expr            { $$ = make_expr_from_for($1); }
     ;
 
-lit_expr: T_NUMBER { $$ = make_lit_expr(LIT_NUMBER, strval); }
-        | T_STRING { $$ = make_lit_expr(LIT_STRING, strval); }
+lit_expr: T_NUMBER { $$ = make_lit_expr(LIT_NUMBER, strdup(strval)); }
+        | T_STRING { $$ = make_lit_expr(LIT_STRING, strdup(strval)); }
         ;
 
 lookup_expr: id { $$ = make_lookup_expr($1); }
@@ -125,10 +136,18 @@ for_expr: expr T_FOR for_handles T_IN expr
 
 %%
 int main() {
-  return yyparse();
+  struct scope *globals = malloc(sizeof(struct scope));
+  globals->parent = NULL;
+  globals->binds = NULL;
+
+  scope_builtins(globals);
+  int res = yyparse(globals);
+  run_main(globals);
+  scope_exit(globals);
+  return res;
 }
 
-int yyerror(char *s) {
+int yyerror(struct scope *scope, char *s) {
   fprintf(stderr, "%s\n",s);
   return 0;
 }

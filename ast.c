@@ -33,6 +33,7 @@ void free_def_exprs(struct def_exprs *def_exprs) {
 
   if (def_exprs->next != NULL) {
     free_def_exprs(def_exprs->next);
+    free(def_exprs->next);
   }
 }
 
@@ -132,7 +133,7 @@ void free_expr(struct expr *expr) {
 struct lit_expr *make_lit_expr(enum lit_type type, char *v) {
   assert(v != NULL);
   struct lit_expr *lit_expr = malloc(sizeof(struct lit_expr));
-  lit_expr->raw_value = strdup(v);
+  lit_expr->raw_value = v;
   lit_expr->type = type;
   return lit_expr;
 }
@@ -147,7 +148,7 @@ void free_lit_expr(struct lit_expr *lit_expr) {
 struct lookup_expr *make_lookup_expr(char *id) {
   assert(id != NULL);
   struct lookup_expr *lookup_expr = malloc(sizeof(struct lookup_expr));
-  lookup_expr->id = strdup(id);
+  lookup_expr->id = id;
   return lookup_expr;
 }
 
@@ -216,7 +217,7 @@ void free_call_args(struct call_args *call_args) {
 struct call_expr *make_call_expr(char *callee, struct call_args *args) {
   assert(callee != NULL);
   struct call_expr *call_expr = malloc(sizeof(struct call_expr));
-  call_expr->callee = strdup(callee);
+  call_expr->callee = callee;
   call_expr->args = args;
   return call_expr;
 }
@@ -238,7 +239,7 @@ struct let_assigns *make_let_assigns(char *id, struct expr *expr) {
   assert(expr != NULL);
   struct let_assigns *let_assigns = malloc(sizeof(struct let_assigns));
   let_assigns->next = NULL;
-  let_assigns->id = strdup(id);
+  let_assigns->id = id;
   let_assigns->expr = expr;
   return let_assigns;
 }
@@ -301,7 +302,7 @@ void free_let_expr(struct let_expr *let_expr) {
 struct def_params *make_def_params(char *id) {
   assert(id != NULL);
   struct def_params *def_params = malloc(sizeof(struct def_params));
-  def_params->id = strdup(id);
+  def_params->id = id;
   def_params->next = NULL;
   return def_params;
 }
@@ -333,7 +334,7 @@ struct def_expr *make_def_expr(char *id, struct def_params *params,
   assert(id != NULL);
   assert(body != NULL);
   struct def_expr *def_expr = malloc(sizeof(struct def_expr));
-  def_expr->id = strdup(id);
+  def_expr->id = id;
   def_expr->params = params;
   def_expr->body = body;
   return def_expr;
@@ -398,7 +399,7 @@ struct for_handles *make_for_handles(char *id) {
   assert(id != NULL);
   struct for_handles *for_handles = malloc(sizeof(struct for_handles));
   for_handles->next = NULL;
-  for_handles->id = strdup(id);
+  for_handles->id = id;
   return for_handles;
 }
 

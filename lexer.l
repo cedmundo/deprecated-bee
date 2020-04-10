@@ -1,5 +1,6 @@
 %{
 #include <stdio.h>
+#include "run.h"
 #include "y.tab.h"
 int fileno(FILE *stream);
 extern char* strval;

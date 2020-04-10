@@ -1,0 +1,4 @@
+def greet(who) = "Hello " + who + "!"
+
+def main() =
+  puts(greet("Minigun"))
