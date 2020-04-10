@@ -56,6 +56,49 @@ struct value run_bin_expr(struct scope *scope, struct bin_expr *bin_expr) {
   return res;
 }
 
+struct value run_unit_expr(struct scope *scope, struct unit_expr *unit_expr) {
+  assert(scope != NULL);
+  assert(unit_expr != NULL);
+  struct value res;
+  struct value right = run_expr(scope, unit_expr->right);
+  if (unit_expr->op == OP_NEG) {
+    switch (right.type) {
+    case TYPE_U64:
+    case TYPE_I64:
+      res.type = TYPE_I64;
+      res.i64 = -right.i64;
+      break;
+    case TYPE_F64:
+      res.type = TYPE_F64;
+      res.f64 = -right.f64;
+      break;
+    default:
+      make_error(res, "unsupported operation for type");
+      break;
+    }
+  } else if (unit_expr->op == OP_NOT) {
+    switch (right.type) {
+    case TYPE_U64:
+    case TYPE_I64:
+      res.type = TYPE_I64;
+      res.i64 = !right.i64;
+      break;
+    case TYPE_F64:
+      res.type = TYPE_F64;
+      res.f64 = !right.f64;
+      break;
+    default:
+      make_error(res, "unsupported operation for type");
+      break;
+    }
+  } else {
+    make_error(res, "unrecognized unitary operation");
+  }
+
+  free_value(&right);
+  return res;
+}
+
 struct value run_call_expr(struct scope *scope, struct call_expr *call_expr) {
   assert(scope != NULL);
   assert(call_expr != NULL);
@@ -188,6 +231,9 @@ struct value run_expr(struct scope *scope, struct expr *expr) {
     break;
   case EXPR_BIN:
     res = run_bin_expr(scope, expr->bin_expr);
+    break;
+  case EXPR_UNIT:
+    res = run_unit_expr(scope, expr->unit_expr);
     break;
   case EXPR_CALL:
     res = run_call_expr(scope, expr->call_expr);

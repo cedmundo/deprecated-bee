@@ -61,6 +61,14 @@ struct expr *make_expr_from_bin(struct bin_expr *expr) {
   return new_expr;
 }
 
+struct expr *make_expr_from_unit(struct unit_expr *expr) {
+  assert(expr != NULL);
+  struct expr *new_expr = malloc(sizeof(struct expr));
+  new_expr->type = EXPR_UNIT;
+  new_expr->unit_expr = expr;
+  return new_expr;
+}
+
 struct expr *make_expr_from_call(struct call_expr *expr) {
   assert(expr != NULL);
   struct expr *new_expr = malloc(sizeof(struct expr));
@@ -112,6 +120,8 @@ void free_expr(struct expr *expr) {
   case EXPR_BIN:
     free_bin_expr(expr->bin_expr);
     break;
+  case EXPR_UNIT:
+    free_unit_expr(expr->unit_expr);
   case EXPR_CALL:
     free_call_expr(expr->call_expr);
     break;
@@ -180,6 +190,22 @@ void free_bin_expr(struct bin_expr *bin_expr) {
   if (bin_expr->right != NULL) {
     free_expr(bin_expr->right);
     bin_expr->right = NULL;
+  }
+}
+
+struct unit_expr *make_unit_expr(struct expr *right, enum unit_op op) {
+  assert(right != NULL);
+  struct unit_expr *unit_expr = malloc(sizeof(struct unit_expr));
+  unit_expr->right = right;
+  unit_expr->op = op;
+  return unit_expr;
+}
+
+void free_unit_expr(struct unit_expr *unit_expr) {
+  assert(unit_expr != NULL);
+  if (unit_expr->right != NULL) {
+    free_expr(unit_expr->right);
+    unit_expr->right = NULL;
   }
 }
 

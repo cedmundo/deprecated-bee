@@ -30,6 +30,7 @@ int yyerror(struct scope *scope, char *s);
   struct lit_expr *lit_expr;
   struct lookup_expr *lookup_expr;
   struct bin_expr *bin_expr;
+  struct unit_expr *unit_expr;
   struct call_args *call_args;
   struct call_expr *call_expr;
   struct let_assigns *let_assigns;
@@ -47,6 +48,7 @@ int yyerror(struct scope *scope, char *s);
 %type<lit_expr> lit_expr
 %type<lookup_expr> lookup_expr
 %type<bin_expr> bin_expr
+%type<unit_expr> unit_expr
 %type<call_args> call_args
 %type<call_expr> call_expr
 %type<let_assigns> let_assigns
@@ -86,6 +88,7 @@ expr: T_LPAR expr T_RPAR  { $$ = $2; }
     | lit_expr            { $$ = make_expr_from_lit($1); }
     | lookup_expr         { $$ = make_expr_from_lookup($1); }
     | bin_expr            { $$ = make_expr_from_bin($1);}
+    | unit_expr           { $$ = make_expr_from_unit($1);}
     | call_expr           { $$ = make_expr_from_call($1); }
     | let_expr            { $$ = make_expr_from_let($1); }
     | def_expr            { $$ = make_expr_from_def($1); }
@@ -116,6 +119,10 @@ bin_expr: expr T_ADD expr  { $$ = make_bin_expr($1, $3, OP_ADD); }
         | expr T_GT expr   { $$ = make_bin_expr($1, $3, OP_GT); }
         | expr T_GE expr   { $$ = make_bin_expr($1, $3, OP_GE); }
         ;
+
+unit_expr: T_NOT expr               { $$ = make_unit_expr($2, OP_NOT); }
+         | T_SUB expr %prec T_SUB   { $$ = make_unit_expr($2, OP_NEG); }
+         ;
 
 call_args: %empty                   { $$ = NULL; }
          | expr                     { $$ = make_call_args($1); }

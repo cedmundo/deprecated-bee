@@ -5,6 +5,7 @@ struct expr;
 struct lit_expr;
 struct lookup_expr;
 struct bin_expr;
+struct unit_expr;
 struct call_args;
 struct call_expr;
 struct let_assigns;
@@ -24,6 +25,7 @@ enum expr_type {
   EXPR_LIT,
   EXPR_LOOKUP,
   EXPR_BIN,
+  EXPR_UNIT,
   EXPR_CALL,
   EXPR_LET,
   EXPR_DEF,
@@ -35,6 +37,7 @@ struct expr {
     struct lit_expr *lit_expr;
     struct lookup_expr *lookup_expr;
     struct bin_expr *bin_expr;
+    struct unit_expr *unit_expr;
     struct call_expr *call_expr;
     struct let_expr *let_expr;
     struct def_expr *def_expr;
@@ -76,6 +79,15 @@ struct bin_expr {
   struct expr *left;
   struct expr *right;
   enum bin_op op;
+};
+
+enum unit_op {
+  OP_NOT,
+  OP_NEG,
+};
+struct unit_expr {
+  struct expr *right;
+  enum unit_op op;
 };
 
 struct call_args {
@@ -135,6 +147,7 @@ void free_def_exprs(struct def_exprs *def_exprs);
 struct expr *make_expr_from_lit(struct lit_expr *expr);
 struct expr *make_expr_from_lookup(struct lookup_expr *expr);
 struct expr *make_expr_from_bin(struct bin_expr *expr);
+struct expr *make_expr_from_unit(struct unit_expr *expr);
 struct expr *make_expr_from_call(struct call_expr *expr);
 struct expr *make_expr_from_let(struct let_expr *expr);
 struct expr *make_expr_from_def(struct def_expr *expr);
@@ -151,6 +164,9 @@ void free_lookup_expr(struct lookup_expr *lookup_expr);
 struct bin_expr *make_bin_expr(struct expr *left, struct expr *right,
                                enum bin_op op);
 void free_bin_expr(struct bin_expr *bin_expr);
+
+struct unit_expr *make_unit_expr(struct expr *right, enum unit_op op);
+void free_unit_expr(struct unit_expr *unit_expr);
 
 struct call_args *make_call_args(struct expr *expr);
 struct call_args *append_call_args(struct call_args *left, struct expr *expr);

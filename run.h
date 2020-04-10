@@ -54,6 +54,7 @@ struct value run_lit_expr(struct scope *scope, struct lit_expr *lit_expr);
 struct value run_lookup_expr(struct scope *scope,
                              struct lookup_expr *lookup_expr);
 struct value run_bin_expr(struct scope *scope, struct bin_expr *bin_expr);
+struct value run_unit_expr(struct scope *scope, struct unit_expr *unit_expr);
 struct value run_call_expr(struct scope *scope, struct call_expr *call_expr);
 struct value run_def_expr(struct scope *scope, struct def_expr *def_expr);
 struct value run_let_expr(struct scope *scope, struct let_expr *let_expr);
