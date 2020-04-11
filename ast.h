@@ -15,6 +15,7 @@ struct def_expr;
 struct if_expr;
 struct for_handles;
 struct for_expr;
+struct list_expr;
 
 struct def_exprs {
   struct def_exprs *next;
@@ -31,6 +32,7 @@ enum expr_type {
   EXPR_DEF,
   EXPR_IF,
   EXPR_FOR,
+  EXPR_LIST,
 };
 struct expr {
   union {
@@ -43,6 +45,7 @@ struct expr {
     struct def_expr *def_expr;
     struct if_expr *if_expr;
     struct for_expr *for_expr;
+    struct list_expr *list_expr;
   };
   enum expr_type type;
 };
@@ -139,6 +142,11 @@ struct for_expr {
   struct for_handles *handle_expr;
 };
 
+struct list_expr {
+  struct list_expr *next;
+  struct expr *item;
+};
+
 struct def_exprs *make_def_exprs(struct def_expr *def_expr);
 struct def_exprs *append_def_exprs(struct def_exprs *left,
                                    struct def_expr *def_expr);
@@ -153,6 +161,7 @@ struct expr *make_expr_from_let(struct let_expr *expr);
 struct expr *make_expr_from_def(struct def_expr *expr);
 struct expr *make_expr_from_if(struct if_expr *expr);
 struct expr *make_expr_from_for(struct for_expr *expr);
+struct expr *make_expr_from_list(struct list_expr *expr);
 void free_expr(struct expr *expr);
 
 struct lit_expr *make_lit_expr(enum lit_type type, char *v);
@@ -204,6 +213,10 @@ struct for_expr *make_for_expr(struct expr *iteration,
                                struct for_handles *handles,
                                struct expr *iterator);
 void free_for_expr(struct for_expr *for_expr);
+
+struct list_expr *make_list_expr(struct expr *item);
+struct list_expr *append_list_expr(struct list_expr *left, struct expr *expr);
+void free_list_expr(struct list_expr *expr);
 
 #define walk_to_last(i, c, block)                                              \
   do {                                                                         \

@@ -6,6 +6,7 @@ struct value;
 struct bind;
 struct scope;
 struct function;
+struct list;
 
 enum type {
   TYPE_UNIT = 1,
@@ -14,15 +15,17 @@ enum type {
   TYPE_I64 = 8,
   TYPE_U64 = 16,
   TYPE_F64 = 32,
-  TYPE_ERROR = 64,
+  TYPE_LIST = 64,
+  TYPE_ERROR = 128,
 };
 struct value {
   union {
+    char *str;
     struct function *fun;
+    struct list *list;
     uint64_t u64;
     int64_t i64;
     double f64;
-    char *str;
   };
   enum type type;
 };
@@ -50,6 +53,11 @@ struct function {
   enum function_type type;
 };
 
+struct list {
+  struct list *next;
+  struct value value;
+};
+
 struct value run_lit_expr(struct scope *scope, struct lit_expr *lit_expr);
 struct value run_lookup_expr(struct scope *scope,
                              struct lookup_expr *lookup_expr);
@@ -60,12 +68,15 @@ struct value run_def_expr(struct scope *scope, struct def_expr *def_expr);
 struct value run_let_expr(struct scope *scope, struct let_expr *let_expr);
 struct value run_if_expr(struct scope *scope, struct if_expr *if_expr);
 struct value run_for_expr(struct scope *scope, struct for_expr *for_expr);
+struct value run_list_expr(struct scope *scope, struct list_expr *expr);
 struct value run_expr(struct scope *scope, struct expr *expr);
 
 void run_all_def_exprs(struct scope *scope, struct def_exprs *def_exprs);
 void run_main(struct scope *scope);
 
+void print_value(struct value value);
 void free_value(struct value *value);
+void free_list(struct list *list);
 
 struct scope *scope_fork(struct scope *parent);
 void scope_exit(struct scope *scope);

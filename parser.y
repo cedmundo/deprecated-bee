@@ -16,7 +16,7 @@ int yyerror(struct scope *scope, char *s);
 %}
 %start program
 %token T_ID T_STRING T_NUMBER
-%token T_ASSIGN T_LPAR T_RPAR T_COMMA T_COLON T_DOT
+%token T_ASSIGN T_LPAR T_RPAR T_COMMA T_COLON T_DOT T_LCB T_RCB T_LSB T_RSB
 %token T_EQ T_NEQ T_GT T_GE T_LT T_LE
 %token T_ANDS T_ORS T_AND T_OR T_XOR T_NOT
 %token T_ADD T_SUB T_MUL T_DIV T_MOD
@@ -40,6 +40,7 @@ int yyerror(struct scope *scope, char *s);
   struct if_expr *if_expr;
   struct for_handles *for_handles;
   struct for_expr *for_expr;
+  struct list_expr *list_expr;
 }
 
 %type<str> id
@@ -58,6 +59,7 @@ int yyerror(struct scope *scope, char *s);
 %type<if_expr> if_expr
 %type<for_handles> for_handles
 %type<for_expr> for_expr
+%type<list_expr> list_expr list_items
 
 %parse-param {struct scope *scope}
 
@@ -72,6 +74,8 @@ int yyerror(struct scope *scope, char *s);
 %left T_MUL T_DIV T_MOD
 %left T_DOT
 %left T_ID T_STRING T_NUMBER
+%left T_LSB T_RSB
+%left T_LCB T_RCB
 %left T_LPAR T_RPAR
 %left T_DEF
 %%
@@ -94,6 +98,7 @@ expr: T_LPAR expr T_RPAR  { $$ = $2; }
     | def_expr            { $$ = make_expr_from_def($1); }
     | if_expr             { $$ = make_expr_from_if($1); }
     | for_expr            { $$ = make_expr_from_for($1); }
+    | list_expr           { $$ = make_expr_from_list($1); }
     ;
 
 lit_expr: T_NUMBER { $$ = make_lit_expr(LIT_NUMBER, strdup(strval)); }
@@ -155,6 +160,13 @@ for_handles: id                       { $$ = make_for_handles($1); }
 
 for_expr: expr T_FOR for_handles T_IN expr
             { $$ = make_for_expr($1, $3, $5); }
+
+list_items: %empty                    { $$ = NULL; }
+          | expr                      { $$ = make_list_expr($1); }
+          | list_items T_COMMA expr   { $$ = append_list_expr($1, $3); }
+          ;
+
+list_expr: T_LSB list_items T_RSB     { $$ = $2; }
 
 %%
 int main() {

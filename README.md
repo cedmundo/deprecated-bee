@@ -7,13 +7,16 @@ programming language, the idea it's to incrementally add new features and make a
 
 * Read scripts from stdin.
 * Function and variable binding/definition.
-* Basic arithmetic (add, sub, mul, div), bit (and, or, xor) and comparision (eq, neq, gt, ...).
+* Common arithmetic and logic operations.
+  - Add (`+`), sub (`-`), mul (`*`), div (`/`).
+  - And (`&, &&`), or (`|, ||`), not (`!`), xor (`^`).
+  - Equal (`==`), not equal (`!=`), less than (`<`, `<=`) and greater than (`>`, `>=`).
 * If-else conditions.
+* List collections (`[expr, expr, expr, ...]`).
 
 ## Work in progress
 
 * Bultin functions.
-* Collections.
 * Dictionaries.
 * Map-Filter-Reduce.
 * Lazy iterators.

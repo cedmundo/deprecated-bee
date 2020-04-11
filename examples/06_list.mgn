@@ -1,0 +1,4 @@
+
+def main() = [item(0), 2, item(2), 4]
+
+def item(x) = x + 1

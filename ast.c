@@ -109,6 +109,14 @@ struct expr *make_expr_from_for(struct for_expr *expr) {
   return new_expr;
 }
 
+struct expr *make_expr_from_list(struct list_expr *expr) {
+  assert(expr != NULL);
+  struct expr *new_expr = malloc(sizeof(struct expr));
+  new_expr->type = EXPR_LIST;
+  new_expr->list_expr = expr;
+  return new_expr;
+}
+
 void free_expr(struct expr *expr) {
   switch (expr->type) {
   case EXPR_LIT:
@@ -136,6 +144,9 @@ void free_expr(struct expr *expr) {
     break;
   case EXPR_FOR:
     free_for_expr(expr->for_expr);
+    break;
+  case EXPR_LIST:
+    free_list_expr(expr->list_expr);
     break;
   }
 }
@@ -482,5 +493,37 @@ void free_for_expr(struct for_expr *for_expr) {
     free_for_handles(for_expr->handle_expr);
     free(for_expr->handle_expr);
     for_expr->handle_expr = NULL;
+  }
+}
+
+struct list_expr *make_list_expr(struct expr *item) {
+  assert(item != NULL);
+  struct list_expr *list_expr = malloc(sizeof(struct list_expr));
+  list_expr->next = NULL;
+  list_expr->item = item;
+  return list_expr;
+}
+
+struct list_expr *append_list_expr(struct list_expr *left, struct expr *expr) {
+  assert(left != NULL);
+  assert(expr != NULL);
+  struct list_expr *right = make_list_expr(expr);
+  walk_to_last(struct list_expr, left, {
+    assert(last != NULL);
+    last->next = right;
+  });
+  return left;
+}
+
+void free_list_expr(struct list_expr *list_expr) {
+  assert(list_expr != NULL);
+  if (list_expr->item != NULL) {
+    free_expr(list_expr->item);
+    free(list_expr->item);
+  }
+
+  if (list_expr->next != NULL) {
+    free_list_expr(list_expr->next);
+    free(list_expr->next);
   }
 }

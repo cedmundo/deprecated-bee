@@ -21,6 +21,10 @@ extern char* strval;
 "<="        { return T_LE; }
 "("         { return T_LPAR; }
 ")"         { return T_RPAR; }
+"{"         { return T_LCB; }
+"}"         { return T_RCB; }
+"["         { return T_LSB; }
+"]"         { return T_RSB; }
 "&"         { return T_AND; }
 "&&"        { return T_ANDS; }
 "|"         { return T_OR; }

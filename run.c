@@ -217,6 +217,34 @@ struct value run_for_expr(struct scope *scope, struct for_expr *for_expr) {
   return res;
 }
 
+struct value run_list_expr(struct scope *scope, struct list_expr *list_expr) {
+  assert(scope != NULL);
+  assert(list_expr != NULL);
+  struct value res;
+  res.type = TYPE_LIST;
+  struct list_expr *cur_item = list_expr;
+  struct list *head = NULL;
+  struct list *tail = NULL;
+
+  while (cur_item != NULL) {
+    struct list *item = malloc(sizeof(struct list));
+    item->next = NULL;
+    item->value = run_expr(scope, cur_item->item);
+    if (head == NULL) {
+      head = item;
+    }
+
+    if (tail != NULL) {
+      tail->next = item;
+    }
+    tail = item;
+    cur_item = cur_item->next;
+  }
+
+  res.list = head;
+  return res;
+}
+
 struct value run_expr(struct scope *scope, struct expr *expr) {
   assert(scope != NULL);
   assert(expr != NULL);
@@ -250,6 +278,9 @@ struct value run_expr(struct scope *scope, struct expr *expr) {
   case EXPR_FOR:
     res = run_for_expr(scope, expr->for_expr);
     break;
+  case EXPR_LIST:
+    res = run_list_expr(scope, expr->list_expr);
+    break;
   default:
     make_errorf(res, "error: unknown expression type: %d", expr->type);
   }
@@ -261,31 +292,48 @@ void run_main(struct scope *scope) {
   assert(scope != NULL);
   struct call_expr call_main = {.callee = "main"};
   struct value final_value = run_call_expr(scope, &call_main);
-  switch (final_value.type) {
+  printf("[success] ");
+  print_value(final_value);
+  printf("\n");
+  free_value(&final_value);
+}
+
+void print_value(struct value value) {
+  switch (value.type) {
   case TYPE_UNIT:
-    printf("success [unit]\n");
+    printf("unit");
     break;
   case TYPE_FUNCTION:
-    printf("success [function]\n");
+    printf("function");
     break;
   case TYPE_U64:
-    printf("success [u64] %lu\n", final_value.u64);
+    printf("u64(%lu)", value.u64);
     break;
   case TYPE_I64:
-    printf("success [i64] %lu\n", final_value.i64);
+    printf("i64(%lu)", value.i64);
     break;
   case TYPE_F64:
-    printf("success [f64] %lf\n", final_value.f64);
+    printf("f64(%lf)", value.f64);
     break;
   case TYPE_STRING:
-    printf("success [string] %s\n", final_value.str);
+    printf("string('%s')", value.str);
+    break;
+  case TYPE_LIST:
+    printf("list[");
+    struct list *item = value.list;
+    while (item != NULL) {
+      print_value(item->value);
+      item = item->next;
+      if (item != NULL) {
+        printf(",");
+      }
+    }
+    printf("]");
     break;
   case TYPE_ERROR:
-    printf("failure [error] %s\n", final_value.str);
+    printf("failure [error] %s\n", value.str);
     break;
   }
-
-  free_value(&final_value);
 }
 
 void run_all_def_exprs(struct scope *scope, struct def_exprs *def_exprs) {
@@ -309,9 +357,23 @@ void free_value(struct value *value) {
     }
   }
 
+  if (value->type == TYPE_LIST) {
+    free_list(value->list);
+  }
+
   if (value->str != NULL) {
     free(value->str);
     value->str = NULL;
+  }
+}
+
+void free_list(struct list *list) {
+  struct list *tmp = NULL;
+  while (list != NULL) {
+    tmp = list->next;
+    free_value(&list->value);
+    free(list);
+    list = tmp;
   }
 }
 
