@@ -104,7 +104,7 @@ struct value run_call_expr(struct scope *scope, struct call_expr *call_expr) {
   assert(call_expr != NULL);
 
   struct value res;
-  struct scope *forked = scope_fork(scope);
+  struct scope *forked = scope_fork(scope->parent);
   // resolve function
   struct bind *fun_bind = scope_resolve(scope, call_expr->callee);
   if (fun_bind == NULL) {
