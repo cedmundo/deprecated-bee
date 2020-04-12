@@ -1,0 +1,2 @@
+def a(s) = s
+def main() = a("awa")

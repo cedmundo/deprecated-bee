@@ -9,6 +9,7 @@ struct scope;
 #include "y.tab.h"
 #include "ast.h"
 #include "run.h"
+#include "scope.h"
 
 extern int yylex();
 char *strval;
@@ -171,13 +172,12 @@ list_expr: T_LSB list_items T_RSB     { $$ = $2; }
 %%
 int main() {
   struct scope *globals = malloc(sizeof(struct scope));
-  globals->parent = NULL;
-  globals->binds = NULL;
-
+  scope_init(globals);
   scope_builtins(globals);
   int res = yyparse(globals);
   run_main(globals);
-  scope_exit(globals);
+  scope_leave(globals);
+  free(globals);
   return res;
 }
 

@@ -30,17 +30,6 @@ struct value {
   enum type type;
 };
 
-struct bind {
-  struct bind *next;
-  char *id;
-  struct value value;
-};
-
-struct scope {
-  struct scope *parent;
-  struct bind *binds;
-};
-
 typedef struct value (*native_def)(struct scope *);
 
 enum function_type {
@@ -49,7 +38,7 @@ enum function_type {
 };
 struct function {
   native_def nat_ref;
-  struct def_expr def_ref;
+  struct def_expr *def_ref;
   enum function_type type;
 };
 
@@ -74,22 +63,14 @@ struct value run_expr(struct scope *scope, struct expr *expr);
 void run_all_def_exprs(struct scope *scope, struct def_exprs *def_exprs);
 void run_main(struct scope *scope);
 
+struct list *copy_list(struct list *list);
+struct value copy_value(struct value value);
 void print_value(struct value value);
 void free_value(struct value *value);
-void free_list(struct list *list);
 
-struct scope *scope_fork(struct scope *parent);
-void scope_exit(struct scope *scope);
-
-void scope_bind(struct scope *scope, const char *id, struct value value);
-struct bind *scope_resolve(struct scope *scope, const char *id);
-
-struct scope *scope_builtins(struct scope *scope);
-
+#define ERROR_BUFFER_SIZE 100
 #define make_error(res, msg)                                                   \
   do {                                                                         \
-    fprintf(stderr, (msg));                                                    \
-    fprintf(stderr, "\n");                                                     \
     res.type = TYPE_ERROR;                                                     \
     const char *errmsg = (msg);                                                \
     const size_t msgsize = strlen(errmsg);                                     \
@@ -100,12 +81,8 @@ struct scope *scope_builtins(struct scope *scope);
 
 #define make_errorf(res, msg, ...)                                             \
   do {                                                                         \
-    fprintf(stderr, (msg), __VA_ARGS__);                                       \
-    fprintf(stderr, "\n");                                                     \
     res.type = TYPE_ERROR;                                                     \
-    const char *errmsg = (msg);                                                \
-    const size_t msgsize = strlen(errmsg);                                     \
-    res.str = malloc(msgsize + 1);                                             \
-    memset(res.str, 0L, msgsize);                                              \
+    res.str = malloc(ERROR_BUFFER_SIZE);                                       \
+    memset(res.str, 0L, ERROR_BUFFER_SIZE);                                    \
     sprintf(res.str, msg, __VA_ARGS__);                                        \
   } while (0);

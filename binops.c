@@ -668,7 +668,5 @@ struct value handle_bin_op(struct value left, struct value right,
                 left.type, right.type);
   }
 
-  // free_value(&left);
-  // free_value(&right);
   return res;
 }

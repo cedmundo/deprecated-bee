@@ -1,5 +1,6 @@
 #include "builtins.h"
 #include "run.h"
+#include "scope.h"
 #include <stdio.h>
 
 struct value wrapper_puts(struct scope *scope) {

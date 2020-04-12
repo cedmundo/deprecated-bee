@@ -1,7 +1,7 @@
 #define _GNU_SOURCE
 #include "run.h"
 #include "binops.h"
-#include "builtins.h"
+#include "scope.h"
 #include <assert.h>
 #include <iconv.h>
 #include <stdio.h>
@@ -53,6 +53,8 @@ struct value run_bin_expr(struct scope *scope, struct bin_expr *bin_expr) {
   struct value right_value = run_expr(scope, bin_expr->right);
 
   struct value res = handle_bin_op(left_value, right_value, bin_expr->op);
+  free_value(&left_value);
+  free_value(&right_value);
   return res;
 }
 
@@ -95,7 +97,6 @@ struct value run_unit_expr(struct scope *scope, struct unit_expr *unit_expr) {
     make_error(res, "unrecognized unitary operation");
   }
 
-  free_value(&right);
   return res;
 }
 
@@ -104,20 +105,21 @@ struct value run_call_expr(struct scope *scope, struct call_expr *call_expr) {
   assert(call_expr != NULL);
 
   struct value res;
-  struct scope *forked = scope_fork(scope->parent);
   // resolve function
   struct bind *fun_bind = scope_resolve(scope, call_expr->callee);
   if (fun_bind == NULL) {
-    scope_exit(forked);
-    make_errorf(res, "error: undefined function %s", call_expr->callee);
+    make_errorf(res, "undefined function '%s'", call_expr->callee);
     return res;
   }
   struct value fun_value = fun_bind->value;
   if (fun_value.type != TYPE_FUNCTION) {
-    scope_exit(forked);
-    make_errorf(res, "error: %s is not a function", call_expr->callee);
+    make_errorf(res, "%s is not a function", call_expr->callee);
     return res;
   }
+
+  // FIXME: Is this a good idea? I think this should fork root scope but Im lazy
+  // to implement it
+  struct scope *forked = scope_fork(scope);
   struct function *fun = fun_value.fun;
 
   // bind arguments and call depending if native or defined
@@ -130,31 +132,34 @@ struct value run_call_expr(struct scope *scope, struct call_expr *call_expr) {
     while (cur_arg != NULL) {
       sprintf(argn, "arg_%d", i);
       struct value arg_value = run_expr(scope, cur_arg->expr);
-      scope_bind(scope, argn, arg_value);
+      scope_bind(forked, argn, copy_value(arg_value));
       cur_arg = cur_arg->next;
     }
 
     res = fun->nat_ref(forked);
   } else {
-    struct def_expr def_expr = fun->def_ref;
-    struct def_params *recv_param = def_expr.params;
+    struct def_expr *def_expr = fun->def_ref;
+    struct def_params *recv_param = def_expr->params;
     struct call_args *send_param = call_expr->args;
     while (recv_param != NULL) {
       if (send_param == NULL) {
-        scope_exit(forked);
-        make_errorf(res, "error: %s expects more arguments", call_expr->callee);
+        scope_leave(forked);
+        free(forked);
+        make_errorf(res, "%s expects more arguments", call_expr->callee);
         return res;
       }
 
-      scope_bind(forked, recv_param->id, run_expr(scope, send_param->expr));
+      struct value local_value = run_expr(scope, send_param->expr);
+      scope_bind(forked, recv_param->id, copy_value(local_value));
       send_param = send_param->next;
       recv_param = recv_param->next;
     }
 
-    res = run_expr(forked, def_expr.body);
+    res = run_expr(forked, def_expr->body);
   }
 
-  scope_exit(forked);
+  scope_leave(forked);
+  free(forked);
   return res;
 }
 
@@ -164,11 +169,10 @@ struct value run_def_expr(struct scope *scope, struct def_expr *def_expr) {
   struct value fun_value;
   struct function *fun = malloc(sizeof(struct function));
   fun->type = FUN_DEF;
-  fun->def_ref = *def_expr;
+  fun->def_ref = def_expr;
   fun_value.type = TYPE_FUNCTION;
   fun_value.fun = fun;
   scope_bind(scope, def_expr->id, fun_value);
-  free(def_expr);
   return fun_value;
 }
 
@@ -184,7 +188,8 @@ struct value run_let_expr(struct scope *scope, struct let_expr *let_expr) {
   }
 
   struct value res = run_expr(forked, let_expr->in_expr);
-  scope_exit(forked);
+  scope_leave(forked);
+  free(forked);
   return res;
 }
 
@@ -195,7 +200,7 @@ struct value run_if_expr(struct scope *scope, struct if_expr *if_expr) {
   struct value res;
   struct value cond_value = run_expr(scope, if_expr->cond_expr);
   if (cond_value.type == TYPE_UNIT) {
-    make_error(res, "error: cannot evaluate condition for unit type");
+    make_error(res, "cannot evaluate condition for unit type");
     return res;
   }
 
@@ -205,7 +210,6 @@ struct value run_if_expr(struct scope *scope, struct if_expr *if_expr) {
     res = run_expr(scope, if_expr->else_expr);
   }
 
-  free_value(&cond_value);
   return res;
 }
 
@@ -213,7 +217,7 @@ struct value run_for_expr(struct scope *scope, struct for_expr *for_expr) {
   assert(scope != NULL);
   assert(for_expr != NULL);
   struct value res;
-  make_error(res, "error: is not supported yet!");
+  make_error(res, "is not supported yet!");
   return res;
 }
 
@@ -282,7 +286,7 @@ struct value run_expr(struct scope *scope, struct expr *expr) {
     res = run_list_expr(scope, expr->list_expr);
     break;
   default:
-    make_errorf(res, "error: unknown expression type: %d", expr->type);
+    make_errorf(res, "unknown expression type: %d", expr->type);
   }
 
   return res;
@@ -292,10 +296,59 @@ void run_main(struct scope *scope) {
   assert(scope != NULL);
   struct call_expr call_main = {.callee = "main"};
   struct value final_value = run_call_expr(scope, &call_main);
-  printf("[success] ");
+  printf("[done] ");
   print_value(final_value);
   printf("\n");
   free_value(&final_value);
+}
+
+struct list *copy_list(struct list *list) {
+  struct list *head = NULL;
+  struct list *tail = NULL;
+  struct list *cur = list, *tmp = NULL;
+
+  while (cur != NULL) {
+    tmp = malloc(sizeof(struct list));
+    tmp->value = copy_value(cur->value);
+    cur = cur->next;
+
+    if (head == NULL) {
+      head = tmp;
+    }
+
+    if (tail != NULL) {
+      tail->next = tmp;
+    }
+
+    tail = tmp;
+  }
+
+  return head;
+}
+
+struct value copy_value(struct value value) {
+  struct value copy = {.type = value.type};
+  switch (value.type) {
+  case TYPE_UNIT:
+    break;
+  case TYPE_FUNCTION:
+    copy.fun = malloc(sizeof(struct function));
+    memcpy(copy.fun, value.fun, sizeof(struct function));
+    break;
+  case TYPE_ERROR:
+  case TYPE_STRING:
+    copy.str = strdup(value.str);
+    break;
+  case TYPE_LIST:
+    copy.list = copy_list(value.list);
+    break;
+  case TYPE_U64:
+  case TYPE_I64:
+  case TYPE_F64:
+    memcpy(&copy, &value, sizeof(struct value));
+    break;
+  }
+  return copy;
 }
 
 void print_value(struct value value) {
@@ -331,124 +384,47 @@ void print_value(struct value value) {
     printf("]");
     break;
   case TYPE_ERROR:
-    printf("failure [error] %s\n", value.str);
+    printf("error('%s')", value.str);
+    break;
+  }
+}
+
+void free_value(struct value *value) {
+  struct list *item = NULL, *tmp = NULL;
+  switch (value->type) {
+  case TYPE_FUNCTION:
+    if (value->fun != NULL) {
+      free(value->fun);
+    }
+    break;
+  case TYPE_LIST:
+    item = value->list;
+    while (item != NULL) {
+      free_value(&item->value);
+      tmp = item->next;
+      free(item);
+      item = tmp;
+    }
+    break;
+  case TYPE_STRING:
+  case TYPE_ERROR:
+    if (value->str != NULL) {
+      free(value->str);
+    }
+    break;
+  case TYPE_UNIT:
+  case TYPE_U64:
+  case TYPE_I64:
+  case TYPE_F64:
     break;
   }
 }
 
 void run_all_def_exprs(struct scope *scope, struct def_exprs *def_exprs) {
   assert(scope != NULL);
+  scope->def_exprs = def_exprs;
   while (def_exprs != NULL) {
     run_def_expr(scope, def_exprs->def_expr);
     def_exprs = def_exprs->next;
   }
-}
-
-void free_value(struct value *value) {
-  if (value->type == TYPE_F64 || value->type == TYPE_I64 ||
-      value->type == TYPE_U64 || value->type == TYPE_UNIT) {
-    return;
-  }
-
-  if (value->type == TYPE_FUNCTION) {
-    struct function *fun = value->fun;
-    if (fun->type == FUN_DEF) {
-      free_def_expr(&fun->def_ref);
-    }
-  }
-
-  if (value->type == TYPE_LIST) {
-    free_list(value->list);
-  }
-
-  if (value->str != NULL) {
-    free(value->str);
-    value->str = NULL;
-  }
-}
-
-void free_list(struct list *list) {
-  struct list *tmp = NULL;
-  while (list != NULL) {
-    tmp = list->next;
-    free_value(&list->value);
-    free(list);
-    list = tmp;
-  }
-}
-
-struct scope *scope_fork(struct scope *parent) {
-  struct scope *scope = malloc(sizeof(struct scope));
-  scope->parent = parent;
-  scope->binds = NULL;
-  return scope;
-}
-
-void scope_exit(struct scope *scope) {
-  assert(scope != NULL);
-  struct bind *cur_bind = scope->binds;
-  struct bind *tmp_bind = NULL;
-
-  while (cur_bind != NULL) {
-    free_value(&cur_bind->value);
-    free(cur_bind->id);
-    tmp_bind = cur_bind->next;
-    free(cur_bind);
-    cur_bind = tmp_bind;
-  }
-
-  free(scope);
-}
-
-void scope_bind(struct scope *scope, const char *id, struct value value) {
-  assert(scope != NULL);
-  assert(id != NULL);
-  struct bind *new_bind = malloc(sizeof(struct bind));
-  assert(new_bind != NULL);
-
-  new_bind->id = strdup(id);
-  new_bind->value = value;
-  new_bind->next = NULL;
-
-  struct bind *last_bind = scope->binds;
-  if (last_bind != NULL) {
-    while (last_bind->next != NULL) {
-      last_bind = last_bind->next;
-    }
-
-    last_bind->next = new_bind;
-  } else {
-    scope->binds = new_bind;
-  }
-}
-
-struct bind *scope_resolve(struct scope *scope, const char *id) {
-  assert(scope != NULL);
-  assert(id != NULL);
-  struct bind *bind = scope->binds;
-  while (bind != NULL) {
-    if (strcmp(bind->id, id) == 0) {
-      return bind;
-    }
-
-    bind = bind->next;
-  }
-
-  if (scope->parent != NULL) {
-    return scope_resolve(scope->parent, id);
-  } else {
-    return NULL;
-  }
-}
-
-struct scope *scope_builtins(struct scope *scope) {
-  struct function *fun = malloc(sizeof(struct function));
-  assert(fun != NULL);
-
-  fun->type = FUN_NATIVE;
-  fun->nat_ref = &wrapper_puts;
-
-  struct value puts_v = {.type = TYPE_FUNCTION, .fun = fun};
-  scope_bind(scope, "puts", puts_v);
-  return scope;
 }
