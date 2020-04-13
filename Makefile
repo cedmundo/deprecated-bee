@@ -6,9 +6,9 @@ YACC 	= bison
 YFLAGS 	= -y -d
 LEX 	= lex
 
-all: minigun
+all: bee
 
-minigun: $(OBJ)
+bee: $(OBJ)
 	mkdir -p bin
 	$(CC) -o bin/$@ $^ $(CFLAGS)
 
@@ -32,4 +32,4 @@ clean:
 	rm *.o y.tab.h y.tab.c lex.yy.c
 
 test: all
-	./bin/minigun
+	./bin/bee

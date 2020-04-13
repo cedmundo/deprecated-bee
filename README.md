@@ -1,6 +1,6 @@
-# Minigun
+# Beelang
 
-Another programming language created to learn about interpreters. This is a functional, statically and inferred typed
+Or just Bee, is another programming language created to learn about interpreters. This is a functional, statically and inferred typed
 programming language, the idea it's to incrementally add new features and make a fully-featured toy.
 
 ## Features
@@ -16,11 +16,13 @@ programming language, the idea it's to incrementally add new features and make a
 
 ## Work in progress
 
+* Memory issues.
 * Bultin functions.
 * Dictionaries.
 * Map-Filter-Reduce.
 * Lazy iterators.
 * Comments lol.
+* Modules.
 
 ## Desired features
 
@@ -69,8 +71,8 @@ def f(a) = let b in a + b
 
 ## Building the project
 
-`bison` and `lex` are required to build the `minigun` target, if you happen to be in a decent Unix box with the proper setup to
-c development then just `make` it. Run programs with `./bin/minigun < program.mgn`
+`bison` and `lex` are required to build the `bee` target, if you happen to be in a decent Unix box with the proper setup to
+c development then just `make` it. Run programs with `./bin/bee < program.bee`
 
 ## Project structure
 
