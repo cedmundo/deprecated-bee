@@ -1,0 +1,21 @@
+
+def arith() = -(1 + 2 * 3 / 4)
+
+def logic() = !(1 & 1 | 0) ^ 0
+
+def comp() = 1 == 0 != 1 > 0 < 2
+
+def cond(x) = "yes" if x else "no"
+
+def values() = let a = 1, b = 2 in a + b
+
+def strings(person) = "hello " + person
+
+def main() = [
+  arith(),
+  logic(),
+  comp(),
+  cond(1),
+  values(),
+  strings("world")
+]
