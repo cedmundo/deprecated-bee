@@ -175,7 +175,7 @@ int main() {
   scope_init(globals);
   scope_builtins(globals);
   int res = yyparse(globals);
-  run_main(globals);
+  // run_main(globals);
   scope_leave(globals);
   free(globals);
   return res;

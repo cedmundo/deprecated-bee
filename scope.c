@@ -22,11 +22,14 @@ void scope_init(struct scope *scope) {
 
 void scope_bind(struct scope *scope, const char *id, struct value value) {
   assert(scope != NULL);
-  assert(id != NULL);
   struct bind *new_bind = malloc(sizeof(struct bind));
   assert(new_bind != NULL);
 
-  new_bind->id = strdup(id);
+  if (id != NULL) {
+    new_bind->id = strdup(id);
+  } else {
+    new_bind->id = NULL;
+  }
   new_bind->value = value;
   new_bind->next = NULL;
 
@@ -47,6 +50,11 @@ struct bind *scope_resolve(struct scope *scope, const char *id) {
   assert(id != NULL);
   struct bind *bind = scope->binds;
   while (bind != NULL) {
+    if (bind->id == NULL) {
+      bind = bind->next;
+      continue;
+    }
+
     if (strcmp(bind->id, id) == 0) {
       return bind;
     }
@@ -80,7 +88,10 @@ void scope_leave(struct scope *scope) {
   struct bind *cur = scope->binds;
   struct bind *tmp = NULL;
   while (cur != NULL) {
-    free(cur->id);
+    if (cur->id != NULL) {
+      free(cur->id);
+    }
+
     free_value(&cur->value);
     tmp = cur->next;
     free(cur);
