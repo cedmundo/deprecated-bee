@@ -17,6 +17,7 @@ struct value run_lit_expr(struct scope *scope, struct lit_expr *lit_expr) {
     res.type = TYPE_STRING;
     size_t quoted_size = strlen(lit_expr->raw_value);
     res.str = strndup(lit_expr->raw_value + 1, quoted_size - 2);
+    scope_bind(scope, NULL, res, BIND_OWNER);
   } else {
     if (strstr(lit_expr->raw_value, ".") != NULL) {
       res.type = TYPE_F64;
@@ -40,10 +41,13 @@ struct value run_lookup_expr(struct scope *scope,
   struct bind *value_bind = scope_resolve(scope, lookup_expr->id);
   if (value_bind == NULL) {
     make_errorf(res, "%s is not defined", lookup_expr->id);
+    scope_bind(scope, NULL, res, BIND_OWNER);
     return res;
   }
 
-  return value_bind->value;
+  res = copy_value(value_bind->value);
+  scope_bind(scope, NULL, res, BIND_OWNER);
+  return res;
 }
 
 struct value run_bin_expr(struct scope *scope, struct bin_expr *bin_expr) {
@@ -53,8 +57,7 @@ struct value run_bin_expr(struct scope *scope, struct bin_expr *bin_expr) {
   struct value right_value = run_expr(scope, bin_expr->right);
 
   struct value res = handle_bin_op(left_value, right_value, bin_expr->op);
-  free_value(&left_value);
-  free_value(&right_value);
+  scope_bind(scope, NULL, res, BIND_OWNER);
   return res;
 }
 
@@ -63,6 +66,7 @@ struct value run_unit_expr(struct scope *scope, struct unit_expr *unit_expr) {
   assert(unit_expr != NULL);
   struct value res;
   struct value right = run_expr(scope, unit_expr->right);
+  scope_bind(scope, NULL, right, BIND_OWNER);
   if (unit_expr->op == OP_NEG) {
     switch (right.type) {
     case TYPE_U64:
@@ -76,6 +80,7 @@ struct value run_unit_expr(struct scope *scope, struct unit_expr *unit_expr) {
       break;
     default:
       make_error(res, "unsupported operation for type");
+      scope_bind(scope, NULL, res, BIND_OWNER);
       break;
     }
   } else if (unit_expr->op == OP_NOT) {
@@ -91,10 +96,12 @@ struct value run_unit_expr(struct scope *scope, struct unit_expr *unit_expr) {
       break;
     default:
       make_error(res, "unsupported operation for type");
+      scope_bind(scope, NULL, res, BIND_OWNER);
       break;
     }
   } else {
     make_error(res, "unrecognized unitary operation");
+    scope_bind(scope, NULL, res, BIND_OWNER);
   }
 
   return res;
@@ -109,54 +116,74 @@ struct value run_call_expr(struct scope *scope, struct call_expr *call_expr) {
   struct bind *fun_bind = scope_resolve(scope, call_expr->callee);
   if (fun_bind == NULL) {
     make_errorf(res, "undefined function '%s'", call_expr->callee);
+    scope_bind(scope, NULL, res, BIND_OWNER);
     return res;
   }
   struct value fun_value = fun_bind->value;
   if (fun_value.type != TYPE_FUNCTION) {
     make_errorf(res, "%s is not a function", call_expr->callee);
+    scope_bind(scope, NULL, res, BIND_OWNER);
     return res;
   }
 
-  // FIXME: Is this a good idea? I think this should fork root scope but Im lazy
-  // to implement it
-  struct scope *forked = scope_fork(scope);
+  struct scope *forked = scope_fork(scope->global);
   struct function *fun = fun_value.fun;
-
-  // bind arguments and call depending if native or defined
-  if (fun->type == FUN_NATIVE) {
-    char argn[20];
-    memset(argn, 0L, 20);
-
-    struct call_args *cur_arg = call_expr->args;
-    int i = 0;
-    while (cur_arg != NULL) {
-      sprintf(argn, "arg_%d", i);
-      struct value arg_value = run_expr(scope, cur_arg->expr);
-      scope_bind(forked, argn, copy_value(arg_value));
-      cur_arg = cur_arg->next;
-    }
-
-    res = fun->nat_ref(forked);
-  } else {
+  if (fun->type == FUN_DEF) {
     struct def_expr *def_expr = fun->def_ref;
     struct def_params *recv_param = def_expr->params;
     struct call_args *send_param = call_expr->args;
-    while (recv_param != NULL) {
-      if (send_param == NULL) {
+    while (send_param != NULL) {
+      if (recv_param == NULL) {
         scope_leave(forked);
         free(forked);
         make_errorf(res, "%s expects more arguments", call_expr->callee);
+        scope_bind(scope, NULL, res, BIND_OWNER);
         return res;
       }
 
-      struct value local_value = run_expr(scope, send_param->expr);
-      scope_bind(forked, recv_param->id, copy_value(local_value));
+      struct value local_arg = run_expr(scope, send_param->expr);
+      scope_bind(scope, NULL, local_arg, BIND_BORROW);
+
+      struct value copied_arg = copy_value(local_arg);
+      scope_bind(forked, recv_param->id, copied_arg, BIND_OWNER);
       send_param = send_param->next;
       recv_param = recv_param->next;
     }
 
-    res = run_expr(forked, def_expr->body);
+    struct value res_within_forked = run_expr(forked, def_expr->body);
+    scope_bind(forked, NULL, res_within_forked, BIND_BORROW);
+
+    res = copy_value(res_within_forked);
+    scope_bind(scope, NULL, res, BIND_OWNER);
+
+    scope_leave(forked);
+    free(forked);
+    return res;
+  } else {
+    make_errorf(res, "'%s' is a native function and is not supported yet",
+                call_expr->callee);
+    scope_bind(scope, NULL, res, BIND_OWNER);
+    return res;
   }
+}
+
+struct value run_let_expr(struct scope *scope, struct let_expr *let_expr) {
+  assert(scope != NULL);
+  assert(let_expr != NULL);
+  struct scope *forked = scope_fork(scope);
+
+  struct let_assigns *assign = let_expr->assigns;
+  while (assign != NULL) {
+    struct value value = run_expr(scope, assign->expr);
+    scope_bind(forked, assign->id, value, BIND_BORROW);
+    assign = assign->next;
+  }
+
+  struct value res_within_forked = run_expr(forked, let_expr->in_expr);
+  scope_bind(forked, NULL, res_within_forked, BIND_BORROW);
+
+  struct value res = copy_value(res_within_forked);
+  scope_bind(scope, NULL, res, BIND_OWNER);
 
   scope_leave(forked);
   free(forked);
@@ -172,25 +199,8 @@ struct value run_def_expr(struct scope *scope, struct def_expr *def_expr) {
   fun->def_ref = def_expr;
   fun_value.type = TYPE_FUNCTION;
   fun_value.fun = fun;
-  scope_bind(scope, def_expr->id, fun_value);
+  scope_bind(scope, def_expr->id, fun_value, BIND_OWNER);
   return fun_value;
-}
-
-struct value run_let_expr(struct scope *scope, struct let_expr *let_expr) {
-  assert(scope != NULL);
-  assert(let_expr != NULL);
-  struct scope *forked = scope_fork(scope);
-
-  struct let_assigns *assign = let_expr->assigns;
-  while (assign != NULL) {
-    scope_bind(forked, assign->id, run_expr(scope, assign->expr));
-    assign = assign->next;
-  }
-
-  struct value res = run_expr(forked, let_expr->in_expr);
-  scope_leave(forked);
-  free(forked);
-  return res;
 }
 
 struct value run_if_expr(struct scope *scope, struct if_expr *if_expr) {
@@ -199,8 +209,11 @@ struct value run_if_expr(struct scope *scope, struct if_expr *if_expr) {
 
   struct value res;
   struct value cond_value = run_expr(scope, if_expr->cond_expr);
+  scope_bind(scope, NULL, cond_value, BIND_BORROW);
+
   if (cond_value.type == TYPE_UNIT) {
     make_error(res, "cannot evaluate condition for unit type");
+    scope_bind(scope, NULL, res, BIND_OWNER);
     return res;
   }
 
@@ -210,42 +223,7 @@ struct value run_if_expr(struct scope *scope, struct if_expr *if_expr) {
     res = run_expr(scope, if_expr->else_expr);
   }
 
-  return res;
-}
-
-struct value run_for_expr(struct scope *scope, struct for_expr *for_expr) {
-  assert(scope != NULL);
-  assert(for_expr != NULL);
-  struct value res;
-  make_error(res, "is not supported yet!");
-  return res;
-}
-
-struct value run_list_expr(struct scope *scope, struct list_expr *list_expr) {
-  assert(scope != NULL);
-  assert(list_expr != NULL);
-  struct value res;
-  res.type = TYPE_LIST;
-  struct list_expr *cur_item = list_expr;
-  struct list *head = NULL;
-  struct list *tail = NULL;
-
-  while (cur_item != NULL) {
-    struct list *item = malloc(sizeof(struct list));
-    item->next = NULL;
-    item->value = run_expr(scope, cur_item->item);
-    if (head == NULL) {
-      head = item;
-    }
-
-    if (tail != NULL) {
-      tail->next = item;
-    }
-    tail = item;
-    cur_item = cur_item->next;
-  }
-
-  res.list = head;
+  scope_bind(scope, NULL, res, BIND_BORROW);
   return res;
 }
 
@@ -279,14 +257,9 @@ struct value run_expr(struct scope *scope, struct expr *expr) {
   case EXPR_IF:
     res = run_if_expr(scope, expr->if_expr);
     break;
-  case EXPR_FOR:
-    res = run_for_expr(scope, expr->for_expr);
-    break;
-  case EXPR_LIST:
-    res = run_list_expr(scope, expr->list_expr);
-    break;
   default:
     make_errorf(res, "unknown expression type: %d", expr->type);
+    scope_bind(scope, NULL, res, BIND_OWNER);
   }
 
   return res;
@@ -296,10 +269,8 @@ void run_main(struct scope *scope) {
   assert(scope != NULL);
   struct call_expr call_main = {.callee = "main"};
   struct value final_value = run_call_expr(scope, &call_main);
-  printf("[done] ");
   print_value(final_value);
-  printf("\n");
-  free_value(&final_value);
+  scope_bind(scope, NULL, final_value, BIND_BORROW);
 }
 
 struct list *copy_list(struct list *list) {
@@ -309,7 +280,8 @@ struct list *copy_list(struct list *list) {
 
   while (cur != NULL) {
     tmp = malloc(sizeof(struct list));
-    tmp->value = copy_value(cur->value);
+    tmp->next = NULL;
+    tmp->value = cur->value;
     cur = cur->next;
 
     if (head == NULL) {
@@ -400,7 +372,6 @@ void free_value(struct value *value) {
   case TYPE_LIST:
     item = value->list;
     while (item != NULL) {
-      free_value(&item->value);
       tmp = item->next;
       free(item);
       item = tmp;

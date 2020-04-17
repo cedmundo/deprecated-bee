@@ -173,9 +173,10 @@ list_expr: T_LSB list_items T_RSB     { $$ = $2; }
 int main() {
   struct scope *globals = malloc(sizeof(struct scope));
   scope_init(globals);
+  globals->global = globals; // Weird but needed
   scope_builtins(globals);
   int res = yyparse(globals);
-  // run_main(globals);
+  run_main(globals);
   scope_leave(globals);
   free(globals);
   return res;

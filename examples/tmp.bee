@@ -1,1 +1,2 @@
-def main() = "awa"
+
+def main() = ["awa", "de queso"]
