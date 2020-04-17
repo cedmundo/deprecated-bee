@@ -16,13 +16,13 @@ programming language, the idea it's to incrementally add new features and make a
 
 ## Work in progress
 
-* Memory issues.
-* Bultin functions.
-* Dictionaries.
+* Modules.
+* Lists (with borrowing model).
+* Dictionaries (also with borrowing model).
 * Map-Filter-Reduce.
 * Lazy iterators.
 * Comments lol.
-* Modules.
+* Bultin functions.
 
 ## Desired features
 
