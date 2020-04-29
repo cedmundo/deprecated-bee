@@ -120,16 +120,9 @@ struct value run_call_expr(struct scope *scope, struct call_expr *call_expr) {
     return res;
   }
   struct value fun_value = fun_bind->value;
-  if (fun_value.type != TYPE_FUNCTION) {
-    make_errorf(res, "%s is not a function", call_expr->callee);
-    scope_bind(scope, NULL, res, BIND_OWNER);
-    return res;
-  }
-
   struct scope *forked = scope_fork(scope->global);
-  struct function *fun = fun_value.fun;
-  if (fun->type == FUN_DEF) {
-    struct def_expr *def_expr = fun->def_ref;
+  if (fun_value.type == TYPE_SCRIPT_FUN) {
+    struct def_expr *def_expr = fun_value.script_fun;
     struct def_params *recv_param = def_expr->params;
     struct call_args *send_param = call_expr->args;
     while (send_param != NULL) {
@@ -193,14 +186,11 @@ struct value run_let_expr(struct scope *scope, struct let_expr *let_expr) {
 struct value run_def_expr(struct scope *scope, struct def_expr *def_expr) {
   assert(scope != NULL);
   assert(def_expr != NULL);
-  struct value fun_value;
-  struct function *fun = malloc(sizeof(struct function));
-  fun->type = FUN_DEF;
-  fun->def_ref = def_expr;
-  fun_value.type = TYPE_FUNCTION;
-  fun_value.fun = fun;
-  scope_bind(scope, def_expr->id, fun_value, BIND_OWNER);
-  return fun_value;
+  struct value value;
+  value.type = TYPE_SCRIPT_FUN;
+  value.script_fun = def_expr;
+  scope_bind(scope, def_expr->id, value, BIND_OWNER);
+  return value;
 }
 
 struct value run_if_expr(struct scope *scope, struct if_expr *if_expr) {
@@ -303,10 +293,6 @@ struct value copy_value(struct value value) {
   switch (value.type) {
   case TYPE_UNIT:
     break;
-  case TYPE_FUNCTION:
-    copy.fun = malloc(sizeof(struct function));
-    memcpy(copy.fun, value.fun, sizeof(struct function));
-    break;
   case TYPE_ERROR:
   case TYPE_STRING:
     copy.str = strdup(value.str);
@@ -314,6 +300,8 @@ struct value copy_value(struct value value) {
   case TYPE_LIST:
     copy.list = copy_list(value.list);
     break;
+  case TYPE_NATIVE_FUN:
+  case TYPE_SCRIPT_FUN:
   case TYPE_U64:
   case TYPE_I64:
   case TYPE_F64:
@@ -328,8 +316,11 @@ void print_value(struct value value) {
   case TYPE_UNIT:
     printf("unit");
     break;
-  case TYPE_FUNCTION:
-    printf("function");
+  case TYPE_SCRIPT_FUN:
+    printf("script function");
+    break;
+  case TYPE_NATIVE_FUN:
+    printf("native function");
     break;
   case TYPE_U64:
     printf("u64(%lu)", value.u64);
@@ -364,11 +355,6 @@ void print_value(struct value value) {
 void free_value(struct value *value) {
   struct list *item = NULL, *tmp = NULL;
   switch (value->type) {
-  case TYPE_FUNCTION:
-    if (value->fun != NULL) {
-      free(value->fun);
-    }
-    break;
   case TYPE_LIST:
     item = value->list;
     while (item != NULL) {
@@ -383,6 +369,8 @@ void free_value(struct value *value) {
       free(value->str);
     }
     break;
+  case TYPE_NATIVE_FUN:
+  case TYPE_SCRIPT_FUN:
   case TYPE_UNIT:
   case TYPE_U64:
   case TYPE_I64:

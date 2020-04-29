@@ -7,39 +7,30 @@ struct bind;
 struct scope;
 struct function;
 struct list;
+typedef void (*native_def)(struct scope *, struct value *value);
 
 enum type {
   TYPE_UNIT = 1,
-  TYPE_FUNCTION = 2,
-  TYPE_STRING = 4,
-  TYPE_I64 = 8,
-  TYPE_U64 = 16,
-  TYPE_F64 = 32,
-  TYPE_LIST = 64,
-  TYPE_ERROR = 128,
+  TYPE_STRING = 2,
+  TYPE_I64 = 3,
+  TYPE_U64 = 4,
+  TYPE_F64 = 5,
+  TYPE_LIST = 6,
+  TYPE_ERROR = 7,
+  TYPE_NATIVE_FUN = 8,
+  TYPE_SCRIPT_FUN = 9,
 };
 struct value {
   union {
     char *str;
-    struct function *fun;
     struct list *list;
+    struct def_expr *script_fun;
+    native_def native_fun;
     uint64_t u64;
     int64_t i64;
     double f64;
   };
   enum type type;
-};
-
-typedef struct value (*native_def)(struct scope *);
-
-enum function_type {
-  FUN_NATIVE,
-  FUN_DEF,
-};
-struct function {
-  native_def nat_ref;
-  struct def_expr *def_ref;
-  enum function_type type;
 };
 
 struct list {

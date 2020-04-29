@@ -74,16 +74,9 @@ struct bind *scope_resolve(struct scope *scope, const char *id) {
 }
 
 struct scope *scope_builtins(struct scope *scope) {
-  struct function *fun = malloc(sizeof(struct function));
-  fun->type = FUN_NATIVE;
-  fun->nat_ref = &wrapper_puts;
-  struct value puts_v = {.type = TYPE_FUNCTION, .fun = fun};
+  struct value puts_v = {.type = TYPE_NATIVE_FUN, .native_fun = wrapper_puts};
   scope_bind(scope, "puts", puts_v, BIND_OWNER);
-
-  // Code analysis tools may recognize 'fun' being a possible leak,
-  // I don't know quite why but it is freed during scope_leave so it should
-  // not be a big deal. Also, valgrind does not complain about this anyway.
-  return scope; // NOLINT
+  return scope;
 }
 
 void scope_leave(struct scope *scope) {

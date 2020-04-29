@@ -2,4 +2,4 @@
 #include "run.h"
 #include "scope.h"
 
-struct value wrapper_puts(struct scope *scope);
+void wrapper_puts(struct scope *scope, struct value *value);

@@ -1,2 +1,4 @@
 
-def main() = ["awa", "de queso"]
+def hehe(a) = "xd " + a
+
+def main() = hehe(":P")
