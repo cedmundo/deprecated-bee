@@ -1,7 +1,2 @@
 
-def sublist() = ["this is a sublist", [1, 2, 3]]
-
-/* comment yaay :D */
-def main() =
-  let x = "another string" in
-    ["this is a string", x, sublist()]
+def main() = puts("hello hello!")

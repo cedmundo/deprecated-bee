@@ -117,6 +117,7 @@ struct value run_call_expr(struct scope *scope, struct call_expr *call_expr) {
   }
   struct value fun_value = fun_bind->value;
   struct scope *forked = scope_fork(scope->global);
+  struct value res_within_forked;
   if (fun_value.type == TYPE_SCRIPT_FUN) {
     struct def_expr *def_expr = fun_value.script_fun;
     struct def_params *recv_param = def_expr->params;
@@ -139,7 +140,7 @@ struct value run_call_expr(struct scope *scope, struct call_expr *call_expr) {
       recv_param = recv_param->next;
     }
 
-    struct value res_within_forked = run_expr(forked, def_expr->body);
+    res_within_forked = run_expr(forked, def_expr->body);
     scope_bind(forked, NULL, res_within_forked, BIND_BORROW);
 
     res = copy_value(scope, res_within_forked);
@@ -147,9 +148,37 @@ struct value run_call_expr(struct scope *scope, struct call_expr *call_expr) {
     free(forked);
     return res;
   } else {
-    make_errorf(res, "'%s' is a native function and is not supported yet",
-                call_expr->callee);
-    scope_bind(scope, NULL, res, BIND_OWNER);
+    native_def callee = fun_value.native_fun;
+    struct call_args *send_param = call_expr->args;
+    struct list *params_head = NULL;
+    struct list *params_tail = NULL;
+    while (send_param != NULL) {
+      struct list *item = malloc(sizeof(struct list));
+      item->next = NULL;
+
+      struct value local_arg = run_expr(scope, send_param->expr);
+      scope_bind(scope, NULL, local_arg, BIND_BORROW);
+
+      struct value copied_arg = copy_value(scope, local_arg);
+      item->value = copied_arg;
+
+      if (params_head == NULL) {
+        params_head = item;
+      }
+
+      if (params_tail != NULL) {
+        params_tail->next = item;
+      }
+
+      params_tail = item;
+      send_param = send_param->next;
+    }
+
+    struct value call_args = {.type = TYPE_LIST, .list = params_head};
+    scope_bind(forked, "args", call_args, BIND_OWNER);
+    callee(forked, &res_within_forked);
+    res = copy_value(scope, res_within_forked);
+
     scope_leave(forked);
     free(forked);
     return res;

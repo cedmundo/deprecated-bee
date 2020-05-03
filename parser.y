@@ -21,7 +21,7 @@ int yyerror(struct scope *scope, char *s);
 %token T_EQ T_NEQ T_GT T_GE T_LT T_LE
 %token T_ANDS T_ORS T_AND T_OR T_XOR T_NOT
 %token T_ADD T_SUB T_MUL T_DIV T_MOD
-%token T_DEF T_LET T_FOR T_IN T_IF T_ELSE
+%token T_DEF T_LET T_FOR T_IN T_IF T_ELSE T_REDUCE T_WITH
 
 %union {
   int token;
@@ -100,6 +100,7 @@ expr: T_LPAR expr T_RPAR  { $$ = $2; }
     | if_expr             { $$ = make_expr_from_if($1); }
     | for_expr            { $$ = make_expr_from_for($1); }
     | list_expr           { $$ = make_expr_from_list($1); }
+    | reduce_expr         { $$ = NULL; }
     ;
 
 lit_expr: T_NUMBER { $$ = make_lit_expr(LIT_NUMBER, strdup(strval)); }
@@ -161,6 +162,13 @@ for_handles: id                       { $$ = make_for_handles($1); }
 
 for_expr: expr T_FOR for_handles T_IN expr
             { $$ = make_for_expr($1, $3, $5); }
+        | expr T_FOR for_handles T_IN expr T_IF expr
+            {}
+        ;
+
+reduce_expr: T_REDUCE for_expr T_WITH id T_ASSIGN expr
+            {}
+           ;
 
 list_items: %empty                    { $$ = NULL; }
           | expr                      { $$ = make_list_expr($1); }

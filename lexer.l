@@ -55,6 +55,8 @@ extern char* strval;
 "in"        { return T_IN; }
 "if"        { return T_IF; }
 "else"      { return T_ELSE; }
+"reduce"    { return T_REDUCE; }
+"with"      { return T_WITH; }
 
 [a-zA-Z_\$]+[a-zA-Z0-9_]* {
   strval = yytext;
