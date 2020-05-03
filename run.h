@@ -48,6 +48,8 @@ struct value run_def_expr(struct scope *scope, struct def_expr *def_expr);
 struct value run_let_expr(struct scope *scope, struct let_expr *let_expr);
 struct value run_if_expr(struct scope *scope, struct if_expr *if_expr);
 struct value run_for_expr(struct scope *scope, struct for_expr *for_expr);
+struct value run_reduce_expr(struct scope *scope,
+                             struct reduce_expr *reduce_expr);
 struct value run_list_expr(struct scope *scope, struct list_expr *expr);
 struct value run_expr(struct scope *scope, struct expr *expr);
 

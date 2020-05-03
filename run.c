@@ -240,6 +240,23 @@ struct value run_if_expr(struct scope *scope, struct if_expr *if_expr) {
   return res;
 }
 
+struct value run_for_expr(struct scope *scope, struct for_expr *for_expr) {
+  assert(scope != NULL);
+  assert(for_expr != NULL);
+  struct value res;
+  make_error(res, "map, filter and reduce not supported yet!");
+  return res;
+}
+
+struct value run_reduce_expr(struct scope *scope,
+                             struct reduce_expr *reduce_expr) {
+  assert(scope != NULL);
+  assert(reduce_expr != NULL);
+  struct value res;
+  make_error(res, "map, filter and reduce not supported yet!");
+  return res;
+}
+
 struct value run_list_expr(struct scope *scope, struct list_expr *list_expr) {
   assert(scope != NULL);
 
@@ -302,6 +319,12 @@ struct value run_expr(struct scope *scope, struct expr *expr) {
     break;
   case EXPR_LIST:
     res = run_list_expr(scope, expr->list_expr);
+    break;
+  case EXPR_FOR:
+    res = run_for_expr(scope, expr->for_expr);
+    break;
+  case EXPR_REDUCE:
+    res = run_reduce_expr(scope, expr->reduce_expr);
     break;
   default:
     make_errorf(res, "unknown expression type: %d", expr->type);

@@ -1,2 +1,2 @@
 
-def main() = puts("hello hello!")
+def main() = n for n in [0, 1, 2, 3]

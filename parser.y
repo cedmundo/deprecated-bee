@@ -41,6 +41,7 @@ int yyerror(struct scope *scope, char *s);
   struct if_expr *if_expr;
   struct for_handles *for_handles;
   struct for_expr *for_expr;
+  struct reduce_expr *reduce_expr;
   struct list_expr *list_expr;
 }
 
@@ -60,6 +61,7 @@ int yyerror(struct scope *scope, char *s);
 %type<if_expr> if_expr
 %type<for_handles> for_handles
 %type<for_expr> for_expr
+%type<reduce_expr> reduce_expr
 %type<list_expr> list_expr list_items
 
 %parse-param {struct scope *scope}
@@ -98,9 +100,9 @@ expr: T_LPAR expr T_RPAR  { $$ = $2; }
     | let_expr            { $$ = make_expr_from_let($1); }
     | def_expr            { $$ = make_expr_from_def($1); }
     | if_expr             { $$ = make_expr_from_if($1); }
-    | for_expr            { $$ = make_expr_from_for($1); }
     | list_expr           { $$ = make_expr_from_list($1); }
-    | reduce_expr         { $$ = NULL; }
+    | for_expr            { $$ = make_expr_from_for($1); }
+    | reduce_expr         { $$ = make_expr_from_reduce($1); }
     ;
 
 lit_expr: T_NUMBER { $$ = make_lit_expr(LIT_NUMBER, strdup(strval)); }
@@ -163,11 +165,11 @@ for_handles: id                       { $$ = make_for_handles($1); }
 for_expr: expr T_FOR for_handles T_IN expr
             { $$ = make_for_expr($1, $3, $5); }
         | expr T_FOR for_handles T_IN expr T_IF expr
-            {}
+            { $$ = make_filter_expr($1, $3, $5, $7); }
         ;
 
 reduce_expr: T_REDUCE for_expr T_WITH id T_ASSIGN expr
-            {}
+            { $$ = make_reduce_expr($2, $4, $6); }
            ;
 
 list_items: %empty                    { $$ = NULL; }

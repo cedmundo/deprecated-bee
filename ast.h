@@ -32,6 +32,7 @@ enum expr_type {
   EXPR_DEF,
   EXPR_IF,
   EXPR_FOR,
+  EXPR_REDUCE,
   EXPR_LIST,
 };
 struct expr {
@@ -45,6 +46,7 @@ struct expr {
     struct def_expr *def_expr;
     struct if_expr *if_expr;
     struct for_expr *for_expr;
+    struct reduce_expr *reduce_expr;
     struct list_expr *list_expr;
   };
   enum expr_type type;
@@ -140,6 +142,13 @@ struct for_expr {
   struct expr *iteration_expr;
   struct expr *iterator_expr;
   struct for_handles *handle_expr;
+  struct expr *filter_expr;
+};
+
+struct reduce_expr {
+  struct for_expr *for_expr;
+  char *id;
+  struct expr *value;
 };
 
 struct list_expr {
@@ -160,6 +169,7 @@ struct expr *make_expr_from_let(struct let_expr *expr);
 struct expr *make_expr_from_def(struct def_expr *expr);
 struct expr *make_expr_from_if(struct if_expr *expr);
 struct expr *make_expr_from_for(struct for_expr *expr);
+struct expr *make_expr_from_reduce(struct reduce_expr *expr);
 struct expr *make_expr_from_list(struct list_expr *expr);
 
 struct lit_expr *make_lit_expr(enum lit_type type, char *v);
@@ -199,6 +209,13 @@ struct for_expr *make_for_expr(struct expr *iteration,
                                struct for_handles *handles,
                                struct expr *iterator);
 
+struct for_expr *make_filter_expr(struct expr *iteration,
+                                  struct for_handles *handles,
+                                  struct expr *iterator, struct expr *filter);
+
+struct reduce_expr *make_reduce_expr(struct for_expr *for_expr, char *id,
+                                     struct expr *expr);
+
 struct list_expr *make_list_expr(struct expr *item);
 struct list_expr *append_list_expr(struct list_expr *left, struct expr *expr);
 
@@ -217,6 +234,7 @@ void free_def_expr(struct def_expr *def_expr);
 void free_if_expr(struct if_expr *if_expr);
 void free_for_handles(struct for_handles *for_handles);
 void free_for_expr(struct for_expr *for_expr);
+void free_reduce_expr(struct reduce_expr *reduce_expr);
 void free_list_expr(struct list_expr *list_expr);
 
 #define walk_to_last(i, c, block)                                              \

@@ -95,6 +95,14 @@ struct expr *make_expr_from_for(struct for_expr *expr) {
   return new_expr;
 }
 
+struct expr *make_expr_from_reduce(struct reduce_expr *expr) {
+  assert(expr != NULL);
+  struct expr *new_expr = malloc(sizeof(struct expr));
+  new_expr->type = EXPR_REDUCE;
+  new_expr->reduce_expr = expr;
+  return new_expr;
+}
+
 struct expr *make_expr_from_list(struct list_expr *expr) {
   struct expr *new_expr = malloc(sizeof(struct expr));
   new_expr->type = EXPR_LIST;
@@ -263,7 +271,32 @@ struct for_expr *make_for_expr(struct expr *iteration,
   for_expr->iteration_expr = iteration;
   for_expr->handle_expr = handles;
   for_expr->iterator_expr = iterator;
+  for_expr->filter_expr = NULL;
   return for_expr;
+}
+
+struct for_expr *make_filter_expr(struct expr *iteration,
+                                  struct for_handles *handles,
+                                  struct expr *iterator, struct expr *filter) {
+  assert(iteration != NULL);
+  assert(handles != NULL);
+  assert(iterator != NULL);
+  assert(filter != NULL);
+  struct for_expr *for_expr = make_for_expr(iteration, handles, iterator);
+  for_expr->filter_expr = filter;
+  return for_expr;
+}
+
+struct reduce_expr *make_reduce_expr(struct for_expr *for_expr, char *id,
+                                     struct expr *expr) {
+  assert(for_expr != NULL);
+  assert(id != NULL);
+  assert(expr != NULL);
+  struct reduce_expr *reduce_expr = malloc(sizeof(struct reduce_expr));
+  reduce_expr->for_expr = for_expr;
+  reduce_expr->id = id;
+  reduce_expr->value = expr;
+  return reduce_expr;
 }
 
 struct list_expr *make_list_expr(struct expr *item) {
@@ -335,6 +368,10 @@ void free_expr(struct expr *expr) {
     break;
   case EXPR_FOR:
     free_for_expr(expr->for_expr);
+    free(expr->for_expr);
+    break;
+  case EXPR_REDUCE:
+    free_reduce_expr(expr->reduce_expr);
     free(expr->for_expr);
     break;
   case EXPR_LIST:
@@ -510,6 +547,23 @@ void free_for_expr(struct for_expr *for_expr) {
   if (for_expr->handle_expr != NULL) {
     free_for_handles(for_expr->handle_expr);
     free(for_expr->handle_expr);
+  }
+}
+
+void free_reduce_expr(struct reduce_expr *reduce_expr) {
+  assert(reduce_expr != NULL);
+  if (reduce_expr->for_expr != NULL) {
+    free_for_expr(reduce_expr->for_expr);
+    free(reduce_expr->for_expr);
+  }
+
+  if (reduce_expr->id != NULL) {
+    free(reduce_expr->id);
+  }
+
+  if (reduce_expr->value != NULL) {
+    free_expr(reduce_expr->value);
+    free(reduce_expr->value);
   }
 }
 
