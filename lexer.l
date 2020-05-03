@@ -8,7 +8,19 @@ extern char* strval;
 
 %option nounput
 %option noinput
+%s IN_COMMENT
 %%
+
+<INITIAL>{
+"/*"      BEGIN(IN_COMMENT);
+}
+<IN_COMMENT>{
+"*/"      BEGIN(INITIAL);
+[^*\n]+   // eat comment in chunks
+"*"       // eat the lone star
+\n        yylineno++;
+}
+
 " "         ;
 "\n"        ;
 "\t"        ;

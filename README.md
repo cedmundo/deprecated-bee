@@ -16,20 +16,21 @@ programming language, the idea it's to incrementally add new features and make a
 
 ## Work in progress
 
-* Modules.
 * Dictionaries.
 * Map-Filter-Reduce.
 * Lazy iterators.
-* Comments lol.
 * Bultin functions.
-* Move/Reference objects instead of copying.
+* Move/Reference objects instead of copying all the time.
 
 ## Future features
 
+* Recursive descent parser.
+* Proper error handling.
+* More descriptive errors.
+* Modules and standard library.
 * JIT and FFI.
-* Concurrency.
+* Concurrency and tasks.
 * Closures instead of current scoping model.
-* Task.
 * Abstract Data Types.
 
 As you might think, this project is still on heavy development and it's far from being stable, there are leaks on the overall memory
@@ -41,6 +42,7 @@ My main objective during the design was to build a simplified version of a more 
 in the following block:
 
 ```
+/* a comment */
 def greet(who) = "hello " + who + "!"
 
 def double(x) = let fact = 2 in (x * fact if x else 0)
