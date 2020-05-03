@@ -616,13 +616,24 @@ struct value handle_str_f64(struct value left, struct value right,
 struct value handle_str_str(struct value left, struct value right,
                             enum bin_op op) {
   struct value res;
-  res.type = TYPE_STRING;
-  size_t left_size = strlen(left.str);
-  size_t right_size = strlen(right.str);
-  size_t new_size = left_size + right_size + 1;
-  res.str = malloc(new_size);
-  memset(res.str, 0L, new_size);
-  sprintf(res.str, "%s%s", left.str, right.str);
+  if (op == OP_ADD) {
+    res.type = TYPE_STRING;
+    size_t left_size = strlen(left.str);
+    size_t right_size = strlen(right.str);
+    size_t new_size = left_size + right_size + 1;
+    res.str = malloc(new_size);
+    memset(res.str, 0L, new_size);
+    sprintf(res.str, "%s%s", left.str, right.str);
+  } else if (op == OP_EQ) {
+    res.type = TYPE_I64;
+    res.i64 = strcmp(left.str, right.str) == 0;
+  } else if (op == OP_NEQ) {
+    res.type = TYPE_I64;
+    res.i64 = strcmp(left.str, right.str) != 0;
+  } else {
+    make_error(res, "unsupported or invalid operation between strings");
+  }
+
   return res;
 }
 
