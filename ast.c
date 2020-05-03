@@ -96,7 +96,6 @@ struct expr *make_expr_from_for(struct for_expr *expr) {
 }
 
 struct expr *make_expr_from_list(struct list_expr *expr) {
-  assert(expr != NULL);
   struct expr *new_expr = malloc(sizeof(struct expr));
   new_expr->type = EXPR_LIST;
   new_expr->list_expr = expr;
@@ -339,7 +338,9 @@ void free_expr(struct expr *expr) {
     free(expr->for_expr);
     break;
   case EXPR_LIST:
-    free_list_expr(expr->list_expr);
+    if (expr->list_expr != NULL) {
+      free_list_expr(expr->list_expr);
+    }
     free(expr->list_expr);
     break;
   }

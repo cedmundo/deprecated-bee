@@ -1,4 +1,6 @@
 
-def hehe(a) = "xd " + a
+def sublist() = ["this is a sublist", [1, 2, 3]]
 
-def main() = hehe(":P")
+def main() =
+  let x = "another string" in
+    ["this is a string", x, sublist()]

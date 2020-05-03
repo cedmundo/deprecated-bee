@@ -17,20 +17,20 @@ programming language, the idea it's to incrementally add new features and make a
 ## Work in progress
 
 * Modules.
-* Lists (with borrowing model).
-* Dictionaries (also with borrowing model).
+* Dictionaries.
 * Map-Filter-Reduce.
 * Lazy iterators.
 * Comments lol.
 * Bultin functions.
+* Move/Reference objects instead of copying.
 
-## Desired features
+## Future features
 
-* ADTs
-* JIT
-* FFI
-* Concurrency?
-* Some kind of "side effect" controller?
+* JIT and FFI.
+* Concurrency.
+* Closures instead of current scoping model.
+* Task.
+* Abstract Data Types.
 
 As you might think, this project is still on heavy development and it's far from being stable, there are leaks on the overall memory
 model and there is no optimizations at all.

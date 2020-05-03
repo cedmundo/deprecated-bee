@@ -22,12 +22,9 @@ struct value run_lit_expr(struct scope *scope, struct lit_expr *lit_expr) {
     if (strstr(lit_expr->raw_value, ".") != NULL) {
       res.type = TYPE_F64;
       res.f64 = strtod(lit_expr->raw_value, NULL);
-    } else if (strstr(lit_expr->raw_value, "-") != NULL) {
+    } else {
       res.type = TYPE_I64;
       res.i64 = strtol(lit_expr->raw_value, NULL, 10);
-    } else {
-      res.type = TYPE_U64;
-      res.u64 = strtoul(lit_expr->raw_value, NULL, 10);
     }
   }
   return res;
@@ -45,8 +42,7 @@ struct value run_lookup_expr(struct scope *scope,
     return res;
   }
 
-  res = copy_value(value_bind->value);
-  scope_bind(scope, NULL, res, BIND_OWNER);
+  res = copy_value(scope, value_bind->value);
   return res;
 }
 
@@ -137,8 +133,8 @@ struct value run_call_expr(struct scope *scope, struct call_expr *call_expr) {
       struct value local_arg = run_expr(scope, send_param->expr);
       scope_bind(scope, NULL, local_arg, BIND_BORROW);
 
-      struct value copied_arg = copy_value(local_arg);
-      scope_bind(forked, recv_param->id, copied_arg, BIND_OWNER);
+      struct value copied_arg = copy_value(scope, local_arg);
+      scope_bind(forked, recv_param->id, copied_arg, BIND_BORROW);
       send_param = send_param->next;
       recv_param = recv_param->next;
     }
@@ -146,9 +142,7 @@ struct value run_call_expr(struct scope *scope, struct call_expr *call_expr) {
     struct value res_within_forked = run_expr(forked, def_expr->body);
     scope_bind(forked, NULL, res_within_forked, BIND_BORROW);
 
-    res = copy_value(res_within_forked);
-    scope_bind(scope, NULL, res, BIND_OWNER);
-
+    res = copy_value(scope, res_within_forked);
     scope_leave(forked);
     free(forked);
     return res;
@@ -156,6 +150,8 @@ struct value run_call_expr(struct scope *scope, struct call_expr *call_expr) {
     make_errorf(res, "'%s' is a native function and is not supported yet",
                 call_expr->callee);
     scope_bind(scope, NULL, res, BIND_OWNER);
+    scope_leave(forked);
+    free(forked);
     return res;
   }
 }
@@ -175,9 +171,7 @@ struct value run_let_expr(struct scope *scope, struct let_expr *let_expr) {
   struct value res_within_forked = run_expr(forked, let_expr->in_expr);
   scope_bind(forked, NULL, res_within_forked, BIND_BORROW);
 
-  struct value res = copy_value(res_within_forked);
-  scope_bind(scope, NULL, res, BIND_OWNER);
-
+  struct value res = copy_value(scope, res_within_forked);
   scope_leave(forked);
   free(forked);
   return res;
@@ -217,6 +211,36 @@ struct value run_if_expr(struct scope *scope, struct if_expr *if_expr) {
   return res;
 }
 
+struct value run_list_expr(struct scope *scope, struct list_expr *list_expr) {
+  assert(scope != NULL);
+
+  struct list_expr *cur = list_expr;
+  struct list *head = NULL;
+  struct list *tail = NULL;
+  while (cur != NULL) {
+    struct list *item = malloc(sizeof(struct list));
+    item->next = NULL;
+
+    struct value item_value = run_expr(scope, cur->item);
+    item->value = item_value;
+
+    if (head == NULL) {
+      head = item;
+    }
+
+    if (tail != NULL) {
+      tail->next = item;
+    }
+
+    tail = item;
+    cur = cur->next;
+  }
+
+  struct value res = {.type = TYPE_LIST, .list = head};
+  scope_bind(scope, NULL, res, BIND_OWNER);
+  return res;
+}
+
 struct value run_expr(struct scope *scope, struct expr *expr) {
   assert(scope != NULL);
   assert(expr != NULL);
@@ -247,6 +271,9 @@ struct value run_expr(struct scope *scope, struct expr *expr) {
   case EXPR_IF:
     res = run_if_expr(scope, expr->if_expr);
     break;
+  case EXPR_LIST:
+    res = run_list_expr(scope, expr->list_expr);
+    break;
   default:
     make_errorf(res, "unknown expression type: %d", expr->type);
     scope_bind(scope, NULL, res, BIND_OWNER);
@@ -263,7 +290,7 @@ void run_main(struct scope *scope) {
   scope_bind(scope, NULL, final_value, BIND_BORROW);
 }
 
-struct list *copy_list(struct list *list) {
+struct list *copy_list(struct scope *scope, struct list *list) {
   struct list *head = NULL;
   struct list *tail = NULL;
   struct list *cur = list, *tmp = NULL;
@@ -271,7 +298,7 @@ struct list *copy_list(struct list *list) {
   while (cur != NULL) {
     tmp = malloc(sizeof(struct list));
     tmp->next = NULL;
-    tmp->value = cur->value;
+    tmp->value = copy_value(scope, cur->value);
     cur = cur->next;
 
     if (head == NULL) {
@@ -288,7 +315,7 @@ struct list *copy_list(struct list *list) {
   return head;
 }
 
-struct value copy_value(struct value value) {
+struct value copy_value(struct scope *scope, struct value value) {
   struct value copy = {.type = value.type};
   switch (value.type) {
   case TYPE_UNIT:
@@ -296,9 +323,11 @@ struct value copy_value(struct value value) {
   case TYPE_ERROR:
   case TYPE_STRING:
     copy.str = strdup(value.str);
+    scope_bind(scope, NULL, copy, BIND_OWNER);
     break;
   case TYPE_LIST:
-    copy.list = copy_list(value.list);
+    copy.list = copy_list(scope, value.list);
+    scope_bind(scope, NULL, copy, BIND_OWNER);
     break;
   case TYPE_NATIVE_FUN:
   case TYPE_SCRIPT_FUN:
@@ -317,7 +346,7 @@ void print_value(struct value value) {
     printf("unit");
     break;
   case TYPE_SCRIPT_FUN:
-    printf("script function");
+    printf("function");
     break;
   case TYPE_NATIVE_FUN:
     printf("native function");
@@ -326,7 +355,7 @@ void print_value(struct value value) {
     printf("u64(%lu)", value.u64);
     break;
   case TYPE_I64:
-    printf("i64(%lu)", value.i64);
+    printf("i64(%ld)", value.i64);
     break;
   case TYPE_F64:
     printf("f64(%lf)", value.f64);

@@ -54,8 +54,8 @@ struct value run_expr(struct scope *scope, struct expr *expr);
 void run_all_def_exprs(struct scope *scope, struct def_exprs *def_exprs);
 void run_main(struct scope *scope);
 
-struct list *copy_list(struct list *list);
-struct value copy_value(struct value value);
+struct list *copy_list(struct scope *scope, struct list *list);
+struct value copy_value(struct scope *scope, struct value value);
 void print_value(struct value value);
 void free_value(struct value *value);
 
