@@ -58,8 +58,12 @@ struct lit_expr {
   enum lit_type type;
 };
 
+enum lookup_type { LOOKUP_ID, LOOKUP_KEY };
 struct lookup_expr {
   char *id;
+  struct expr *object;
+  struct expr *key;
+  enum lookup_type type;
 };
 
 enum bin_op {
@@ -175,6 +179,7 @@ struct expr *make_expr_from_list(struct list_expr *expr);
 struct lit_expr *make_lit_expr(enum lit_type type, char *v);
 
 struct lookup_expr *make_lookup_expr(char *id);
+struct lookup_expr *make_lookup_key_expr(struct expr *object, struct expr *key);
 
 struct bin_expr *make_bin_expr(struct expr *left, struct expr *right,
                                enum bin_op op);

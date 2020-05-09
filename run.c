@@ -35,14 +35,62 @@ struct value run_lookup_expr(struct scope *scope,
   assert(scope != NULL);
   assert(lookup_expr != NULL);
   struct value res;
-  struct bind *value_bind = scope_resolve(scope, lookup_expr->id);
-  if (value_bind == NULL) {
-    make_errorf(res, "%s is not defined", lookup_expr->id);
-    scope_bind(scope, NULL, res, BIND_OWNER);
+  if (lookup_expr->type == LOOKUP_ID) {
+    struct bind *value_bind = scope_resolve(scope, lookup_expr->id);
+    if (value_bind == NULL) {
+      make_errorf(res, "%s is not defined", lookup_expr->id);
+      scope_bind(scope, NULL, res, BIND_OWNER);
+      return res;
+    }
+
+    res = copy_value(scope, value_bind->value);
     return res;
+  } else if (lookup_expr->type == LOOKUP_KEY) {
+    assert(lookup_expr->object != NULL);
+    assert(lookup_expr->key != NULL);
+
+    struct value over_value = run_expr(scope, lookup_expr->object);
+    if (over_value.type != TYPE_LIST) {
+      make_error(res, "object is not indexeable");
+      return res;
+    }
+
+    struct value key_value = run_expr(scope, lookup_expr->key);
+    if (key_value.type != TYPE_U64 && key_value.type != TYPE_I64) {
+      make_error(res, "key is not a valid index");
+      return res;
+    }
+
+    int64_t key_index = key_value.i64;
+    if (key_index < 0) {
+      make_error(res, "unsupported negative key index");
+      return res;
+    }
+
+    struct list *cur_item = over_value.list;
+    int64_t cur_index = 0;
+    int index_found = 0;
+
+    struct value cur_value = {.type = TYPE_UNIT};
+    while (cur_item != NULL) {
+      cur_value = cur_item->value;
+      cur_item = cur_item->next;
+
+      if (cur_index == key_index) {
+        index_found = 1;
+        break;
+      }
+      cur_index++;
+    }
+
+    if (!index_found) {
+      make_error(cur_value, "index not found");
+    }
+
+    return cur_value;
   }
 
-  res = copy_value(scope, value_bind->value);
+  make_error(res, "unknown lookup mode");
   return res;
 }
 

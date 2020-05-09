@@ -121,7 +121,22 @@ struct lit_expr *make_lit_expr(enum lit_type type, char *v) {
 struct lookup_expr *make_lookup_expr(char *id) {
   assert(id != NULL);
   struct lookup_expr *lookup_expr = malloc(sizeof(struct lookup_expr));
+  lookup_expr->type = LOOKUP_ID;
   lookup_expr->id = id;
+  lookup_expr->object = NULL;
+  lookup_expr->key = NULL;
+  return lookup_expr;
+}
+
+struct lookup_expr *make_lookup_key_expr(struct expr *object,
+                                         struct expr *key) {
+  assert(object != NULL);
+  assert(key != NULL);
+  struct lookup_expr *lookup_expr = malloc(sizeof(struct lookup_expr));
+  lookup_expr->type = LOOKUP_KEY;
+  lookup_expr->id = NULL;
+  lookup_expr->object = object;
+  lookup_expr->key = key;
   return lookup_expr;
 }
 
@@ -392,8 +407,20 @@ void free_lit_expr(struct lit_expr *lit_expr) {
 
 void free_lookup_expr(struct lookup_expr *lookup_expr) {
   assert(lookup_expr != NULL);
-  if (lookup_expr->id != NULL) {
-    free(lookup_expr->id);
+  if (lookup_expr->type == LOOKUP_ID) {
+    if (lookup_expr->id != NULL) {
+      free(lookup_expr->id);
+    }
+  } else {
+    if (lookup_expr->object != NULL) {
+      free_expr(lookup_expr->object);
+      free(lookup_expr->object);
+    }
+
+    if (lookup_expr->key != NULL) {
+      free_expr(lookup_expr->key);
+      free(lookup_expr->key);
+    }
   }
 }
 

@@ -61,15 +61,13 @@ struct value copy_value(struct scope *scope, struct value value);
 void print_value(struct value value);
 void free_value(struct value *value);
 
-#define ERROR_BUFFER_SIZE 100
+#define ERROR_BUFFER_SIZE 150
 #define make_error(res, msg)                                                   \
   do {                                                                         \
     res.type = TYPE_ERROR;                                                     \
-    const char *errmsg = (msg);                                                \
-    const size_t msgsize = strlen(errmsg);                                     \
-    res.str = malloc(msgsize + 1);                                             \
-    memset(res.str, 0L, msgsize);                                              \
-    memcpy(res.str, errmsg, msgsize);                                          \
+    res.str = malloc(ERROR_BUFFER_SIZE);                                       \
+    memset(res.str, 0L, ERROR_BUFFER_SIZE);                                    \
+    sprintf(res.str, msg);                                                     \
   } while (0);
 
 #define make_errorf(res, msg, ...)                                             \

@@ -109,7 +109,9 @@ lit_expr: T_NUMBER { $$ = make_lit_expr(LIT_NUMBER, strdup(strval)); }
         | T_STRING { $$ = make_lit_expr(LIT_STRING, strdup(strval)); }
         ;
 
-lookup_expr: id { $$ = make_lookup_expr($1); }
+lookup_expr: id                     { $$ = make_lookup_expr($1); }
+           | expr T_LSB expr T_RSB  { $$ = make_lookup_key_expr($1, $3); }
+           ;
 
 bin_expr: expr T_ADD expr  { $$ = make_bin_expr($1, $3, OP_ADD); }
         | expr T_SUB expr  { $$ = make_bin_expr($1, $3, OP_SUB); }
