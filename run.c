@@ -117,7 +117,7 @@ struct value run_call_expr(struct scope *scope, struct call_expr *call_expr) {
   }
   struct value fun_value = fun_bind->value;
   struct scope *forked = scope_fork(scope->global);
-  struct value res_within_forked;
+  struct value res_within_forked = {.type = TYPE_ERROR};
   if (fun_value.type == TYPE_SCRIPT_FUN) {
     struct def_expr *def_expr = fun_value.script_fun;
     struct def_params *recv_param = def_expr->params;
@@ -155,10 +155,9 @@ struct value run_call_expr(struct scope *scope, struct call_expr *call_expr) {
     while (send_param != NULL) {
       struct list *item = malloc(sizeof(struct list));
       item->next = NULL;
+      item->value = (struct value){.type = TYPE_UNIT};
 
       struct value local_arg = run_expr(scope, send_param->expr);
-      scope_bind(scope, NULL, local_arg, BIND_BORROW);
-
       struct value copied_arg = copy_value(scope, local_arg);
       item->value = copied_arg;
 
@@ -243,8 +242,55 @@ struct value run_if_expr(struct scope *scope, struct if_expr *if_expr) {
 struct value run_for_expr(struct scope *scope, struct for_expr *for_expr) {
   assert(scope != NULL);
   assert(for_expr != NULL);
-  struct value res;
-  make_error(res, "map, filter and reduce not supported yet!");
+  struct list *res_head = NULL;
+  struct list *res_tail = NULL;
+  struct value iterator_value = run_expr(scope, for_expr->iterator_expr);
+  if (iterator_value.type == TYPE_LIST) {
+    struct list *cur_item = iterator_value.list;
+    while (cur_item != NULL) {
+      struct scope *forked = scope_fork(scope);
+      char *item_handle_id =
+          for_expr->handle_expr->id; // only one iterator handler is supported
+      scope_bind(forked, item_handle_id, cur_item->value, BIND_BORROW);
+
+      if (for_expr->filter_expr != NULL) {
+        struct value filter_value = run_expr(forked, for_expr->filter_expr);
+        if (filter_value.type != TYPE_ERROR &&
+            filter_value.type != TYPE_NATIVE_FUN &&
+            filter_value.type != TYPE_SCRIPT_FUN && filter_value.u64 == 0) {
+          cur_item = cur_item->next;
+          continue;
+        }
+      }
+
+      struct value tmp_iteration = run_expr(forked, for_expr->iteration_expr);
+      struct value iteration_value = copy_value(scope, tmp_iteration);
+      struct list *new_item = malloc(sizeof(struct list));
+      new_item->next = NULL;
+      new_item->value = iteration_value;
+
+      if (res_head == NULL) {
+        res_head = new_item;
+      }
+
+      if (res_tail != NULL) {
+        res_tail->next = new_item;
+      }
+
+      res_tail = new_item;
+      scope_leave(forked);
+      free(forked);
+
+      cur_item = cur_item->next;
+    }
+  } else {
+    struct value res;
+    make_errorf(res, "cannot iterate over type %d", iterator_value.type);
+    return res;
+  }
+
+  struct value res = {.type = TYPE_LIST, .list = res_head};
+  scope_bind(scope, NULL, res, BIND_OWNER);
   return res;
 }
 
@@ -252,9 +298,42 @@ struct value run_reduce_expr(struct scope *scope,
                              struct reduce_expr *reduce_expr) {
   assert(scope != NULL);
   assert(reduce_expr != NULL);
-  struct value res;
-  make_error(res, "map, filter and reduce not supported yet!");
-  return res;
+  struct for_expr *for_expr = reduce_expr->for_expr;
+  struct value iterator_value = run_expr(scope, for_expr->iterator_expr);
+  struct value carry = run_expr(scope, reduce_expr->value);
+
+  if (iterator_value.type == TYPE_LIST) {
+    struct list *cur_item = iterator_value.list;
+    while (cur_item != NULL) {
+      struct scope *forked = scope_fork(scope);
+      char *item_handle_id =
+          for_expr->handle_expr->id; // only one iterator handler is supported
+      scope_bind(forked, item_handle_id, cur_item->value, BIND_BORROW);
+      scope_bind(forked, reduce_expr->id, carry, BIND_BORROW);
+
+      if (for_expr->filter_expr != NULL) {
+        struct value filter_value = run_expr(forked, for_expr->filter_expr);
+        if (filter_value.type != TYPE_ERROR &&
+            filter_value.type != TYPE_NATIVE_FUN &&
+            filter_value.type != TYPE_SCRIPT_FUN && filter_value.u64 == 0) {
+          cur_item = cur_item->next;
+          continue;
+        }
+      }
+
+      carry = run_expr(forked, for_expr->iteration_expr);
+      scope_leave(forked);
+      free(forked);
+      cur_item = cur_item->next;
+    }
+  } else {
+    struct value res;
+    make_errorf(res, "cannot iterate over type %d", iterator_value.type);
+    return res;
+  }
+
+  scope_bind(scope, NULL, carry, BIND_OWNER);
+  return carry;
 }
 
 struct value run_list_expr(struct scope *scope, struct list_expr *list_expr) {

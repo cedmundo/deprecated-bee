@@ -13,11 +13,11 @@ programming language, the idea it's to incrementally add new features and make a
   - Equal (`==`), not equal (`!=`), less than (`<`, `<=`) and greater than (`>`, `>=`).
 * If-else conditions.
 * List collections (`[expr, expr, expr, ...]`).
+* Map, Filter and Reduce via list comprehensions (`x for x in [1, 2, 3]` and `reduce c + n for n in [1, 2, 3] with c = 0`).
 
 ## Work in progress
 
 * Dictionaries.
-* Map-Filter-Reduce.
 * Lazy iterators.
 * Bultin functions.
 * Move/Reference objects instead of copying all the time.
@@ -47,6 +47,10 @@ def greet(who) = "hello " + who + "!"
 
 def double(x) = let fact = 2 in (x * fact if x else 0)
 
+def greetAll() = "hello " + person for person in ["world!", "dude!", "bee"]
+
+def sum(l) = reduce c + n for n in l with c = 0
+
 def main() = double(2)
 ```
 
@@ -55,6 +59,7 @@ A summary of the feature set:
   * `def` defines a new function into the current scope
   * `let` forks the scope assigning new bindings (i.e. `a = 1, b = 2, c = 3`), then executes an expression within that scope.
   * `if-else` it's just like your normal if-else.
+  * `for-in/reduce-with` are list comprehensions just like python (reduce don't but it's not hard).
   * Variable and expression types are lazly interpreted.
 
 ## Memory model

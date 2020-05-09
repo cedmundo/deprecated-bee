@@ -1,2 +1,4 @@
 
-def main() = n for n in [0, 1, 2, 3]
+def sum(l) = reduce c + n for n in l with c = 0
+
+def main() = sum([1, 2, 3])

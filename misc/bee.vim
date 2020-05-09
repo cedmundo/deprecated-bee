@@ -7,7 +7,7 @@ if exists("b:current_syntax")
   finish
 endif
 
-syn keyword beeKeywords def let if else in for skipwhite
+syn keyword beeKeywords def let if else in for reduce with skipwhite
 syn region beeBlock start="(" end=")" fold transparent
 syn region beeList start="\[" end="\]" fold transparent
 syn region beeString oneline start='"' skip=/\\./ end='"'

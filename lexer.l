@@ -47,6 +47,7 @@ extern char* strval;
 "-"         { return T_SUB; }
 "*"         { return T_MUL; }
 "/"         { return T_DIV; }
+"%"         { return T_MOD; }
 ","         { return T_COMMA; }
 "."         { return T_DOT; }
 "def"       { return T_DEF; }

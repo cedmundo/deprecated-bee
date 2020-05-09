@@ -1,0 +1,8 @@
+def fizzBuzz(n) =
+  "FizzBuzz" if (n % 15) == 0 else
+    "Fizz" if (n % 5) == 0 else
+      "Buzz" if (n % 3) == 0 else
+        ""
+
+def main() =
+  puts(fizzBuzz(n)) for n in [1, 2, 3] if fizzBuzz(n) != ""
