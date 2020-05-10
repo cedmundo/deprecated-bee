@@ -21,7 +21,7 @@ int yyerror(struct scope *scope, char *s);
 %token T_EQ T_NEQ T_GT T_GE T_LT T_LE
 %token T_ANDS T_ORS T_AND T_OR T_XOR T_NOT
 %token T_ADD T_SUB T_MUL T_DIV T_MOD
-%token T_DEF T_LET T_FOR T_IN T_IF T_ELSE T_REDUCE T_WITH
+%token T_DEF T_LET T_FOR T_IN T_IF T_THEN T_ELSE T_ELIF T_REDUCE T_WITH
 
 %union {
   int token;
@@ -66,11 +66,15 @@ int yyerror(struct scope *scope, char *s);
 
 %parse-param {struct scope *scope}
 
+%nonassoc ELIFX
+
 %right T_ASSIGN
 %right T_IN
+%right T_ELIF
+%right T_ELSE
 %left T_COMMA
 %left T_LET
-%left T_FOR T_IF T_ELSE
+%left T_FOR T_IF
 %left T_EQ T_NEQ T_LT T_LE T_GT T_GE
 %left T_ANDS T_ORS T_AND T_OR T_XOR T_NOT
 %left T_ADD T_SUB
@@ -158,7 +162,15 @@ def_params: %empty                  { $$ = NULL; }
 def_expr: T_DEF id T_LPAR def_params T_RPAR T_ASSIGN expr
           { $$ = make_def_expr($2, $4, $7); }
 
-if_expr: expr T_IF expr T_ELSE expr   { $$ = make_if_expr($1, $3, $5); }
+elif_expr: T_ELIF expr T_THEN expr
+
+elif_exprs: elif_expr
+          | elif_exprs elif_expr
+          ;
+
+if_expr: T_IF expr T_THEN expr elif_exprs T_ELSE expr { $$ = make_if_expr($2, $4, $7); }
+       | T_IF expr T_THEN expr T_ELSE expr            { $$ = make_if_expr($2, $4, $6); }
+       ;
 
 for_handles: id                       { $$ = make_for_handles($1); }
            | for_handles T_COMMA id   { $$ = append_for_handles($1, $3); }

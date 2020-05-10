@@ -204,7 +204,7 @@ struct def_params *append_def_params(struct def_params *left, char *id);
 struct def_expr *make_def_expr(char *id, struct def_params *params,
                                struct expr *body);
 
-struct if_expr *make_if_expr(struct expr *then_expr, struct expr *cond_expr,
+struct if_expr *make_if_expr(struct expr *cond_expr, struct expr *then_expr,
                              struct expr *else_expr);
 
 struct for_handles *make_for_handles(char *id);

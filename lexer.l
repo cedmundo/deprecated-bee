@@ -55,6 +55,8 @@ extern char* strval;
 "for"       { return T_FOR; }
 "in"        { return T_IN; }
 "if"        { return T_IF; }
+"then"      { return T_THEN; }
+"elif"      { return T_ELIF; }
 "else"      { return T_ELSE; }
 "reduce"    { return T_REDUCE; }
 "with"      { return T_WITH; }

@@ -246,10 +246,10 @@ struct def_expr *make_def_expr(char *id, struct def_params *params,
   return def_expr;
 }
 
-struct if_expr *make_if_expr(struct expr *then_expr, struct expr *cond_expr,
+struct if_expr *make_if_expr(struct expr *cond_expr, struct expr *then_expr,
                              struct expr *else_expr) {
-  assert(then_expr != NULL);
   assert(cond_expr != NULL);
+  assert(then_expr != NULL);
   assert(else_expr != NULL);
   struct if_expr *if_expr = malloc(sizeof(struct if_expr));
   if_expr->then_expr = then_expr;

@@ -1,3 +1,2 @@
 
-def main() = let list = [0, 1, 2] in
-  reduce c + n for n in list with c = 0
+def main() = if "hello" == "world" then "equal" else "not equal"
