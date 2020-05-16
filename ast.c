@@ -247,15 +247,42 @@ struct def_expr *make_def_expr(char *id, struct def_params *params,
 }
 
 struct if_expr *make_if_expr(struct expr *cond_expr, struct expr *then_expr,
-                             struct expr *else_expr) {
+                             struct cond_expr *elifs, struct expr *else_expr) {
   assert(cond_expr != NULL);
   assert(then_expr != NULL);
   assert(else_expr != NULL);
+
   struct if_expr *if_expr = malloc(sizeof(struct if_expr));
-  if_expr->then_expr = then_expr;
-  if_expr->cond_expr = cond_expr;
+  struct cond_expr *cond = malloc(sizeof(struct cond_expr));
+  cond->next = elifs;
+  cond->then = then_expr;
+  cond->cond = cond_expr;
+
+  if_expr->conds = cond;
   if_expr->else_expr = else_expr;
   return if_expr;
+}
+
+struct cond_expr *make_cond_expr(struct expr *cond, struct expr *then) {
+  assert(cond != NULL);
+  assert(then != NULL);
+  struct cond_expr *cond_expr = malloc(sizeof(struct cond_expr));
+  cond_expr->cond = cond;
+  cond_expr->then = then;
+  cond_expr->next = NULL;
+  return cond_expr;
+}
+
+struct cond_expr *append_cond_expr(struct cond_expr *left,
+                                   struct cond_expr *right) {
+  assert(left != NULL);
+  assert(right != NULL);
+  walk_to_last(struct cond_expr, left, {
+    assert(last != NULL);
+    last->next = right;
+  });
+
+  return left;
 }
 
 struct for_handles *make_for_handles(char *id) {
@@ -531,19 +558,31 @@ void free_def_expr(struct def_expr *def_expr) {
 
 void free_if_expr(struct if_expr *if_expr) {
   assert(if_expr != NULL);
-  if (if_expr->cond_expr != NULL) {
-    free_expr(if_expr->cond_expr);
-    free(if_expr->cond_expr);
-  }
-
-  if (if_expr->then_expr != NULL) {
-    free_expr(if_expr->then_expr);
-    free(if_expr->then_expr);
+  if (if_expr->conds != NULL) {
+    free_cond_expr(if_expr->conds);
+    free(if_expr->conds);
   }
 
   if (if_expr->else_expr != NULL) {
     free_expr(if_expr->else_expr);
     free(if_expr->else_expr);
+  }
+}
+
+void free_cond_expr(struct cond_expr *cond_expr) {
+  if (cond_expr->cond != NULL) {
+    free_expr(cond_expr->cond);
+    free(cond_expr->cond);
+  }
+
+  if (cond_expr->then != NULL) {
+    free_expr(cond_expr->then);
+    free(cond_expr->then);
+  }
+
+  if (cond_expr->next != NULL) {
+    free_cond_expr(cond_expr->next);
+    free(cond_expr->next);
   }
 }
 

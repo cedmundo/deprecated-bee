@@ -268,21 +268,27 @@ struct value run_if_expr(struct scope *scope, struct if_expr *if_expr) {
   assert(if_expr != NULL);
 
   struct value res;
-  struct value cond_value = run_expr(scope, if_expr->cond_expr);
-  scope_bind(scope, NULL, cond_value, BIND_BORROW);
+  struct cond_expr *cur_cond = if_expr->conds;
+  while (cur_cond != NULL) {
+    struct value cond_value = run_expr(scope, cur_cond->cond);
+    scope_bind(scope, NULL, cond_value, BIND_BORROW);
 
-  if (cond_value.type == TYPE_UNIT) {
-    make_error(res, "cannot evaluate condition for unit type");
-    scope_bind(scope, NULL, res, BIND_OWNER);
-    return res;
+    if (cond_value.type == TYPE_UNIT) {
+      make_error(res, "cannot evaluate condition for unit type");
+      scope_bind(scope, NULL, res, BIND_OWNER);
+      return res;
+    }
+
+    if (cond_value.u64) {
+      res = run_expr(scope, cur_cond->then);
+      scope_bind(scope, NULL, res, BIND_BORROW);
+      return res;
+    }
+
+    cur_cond = cur_cond->next;
   }
 
-  if (cond_value.u64) {
-    res = run_expr(scope, if_expr->then_expr);
-  } else {
-    res = run_expr(scope, if_expr->else_expr);
-  }
-
+  res = run_expr(scope, if_expr->else_expr);
   scope_bind(scope, NULL, res, BIND_BORROW);
   return res;
 }

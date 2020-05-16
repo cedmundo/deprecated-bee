@@ -39,6 +39,7 @@ int yyerror(struct scope *scope, char *s);
   struct def_params *def_params;
   struct def_expr *def_expr;
   struct if_expr *if_expr;
+  struct cond_expr *cond_expr;
   struct for_handles *for_handles;
   struct for_expr *for_expr;
   struct reduce_expr *reduce_expr;
@@ -59,6 +60,7 @@ int yyerror(struct scope *scope, char *s);
 %type<def_params> def_params
 %type<def_expr> def_expr
 %type<if_expr> if_expr
+%type<cond_expr> elif_expr elif_exprs
 %type<for_handles> for_handles
 %type<for_expr> for_expr
 %type<reduce_expr> reduce_expr
@@ -162,14 +164,14 @@ def_params: %empty                  { $$ = NULL; }
 def_expr: T_DEF id T_LPAR def_params T_RPAR T_ASSIGN expr
           { $$ = make_def_expr($2, $4, $7); }
 
-elif_expr: T_ELIF expr T_THEN expr
+elif_expr: T_ELIF expr T_THEN expr  { $$ = make_cond_expr($2, $4); }
 
-elif_exprs: elif_expr
-          | elif_exprs elif_expr
+elif_exprs: elif_expr               { $$ = $1; }
+          | elif_exprs elif_expr    { $$ = append_cond_expr($1, $2); }
           ;
 
-if_expr: T_IF expr T_THEN expr elif_exprs T_ELSE expr { $$ = make_if_expr($2, $4, $7); }
-       | T_IF expr T_THEN expr T_ELSE expr            { $$ = make_if_expr($2, $4, $6); }
+if_expr: T_IF expr T_THEN expr elif_exprs T_ELSE expr { $$ = make_if_expr($2, $4, $5, $7); }
+       | T_IF expr T_THEN expr T_ELSE expr            { $$ = make_if_expr($2, $4, NULL, $6); }
        ;
 
 for_handles: id                       { $$ = make_for_handles($1); }

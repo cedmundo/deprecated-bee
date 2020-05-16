@@ -132,9 +132,14 @@ struct def_expr {
 };
 
 struct if_expr {
-  struct expr *cond_expr;
-  struct expr *then_expr;
+  struct cond_expr *conds;
   struct expr *else_expr;
+};
+
+struct cond_expr {
+  struct cond_expr *next;
+  struct expr *cond;
+  struct expr *then;
 };
 
 struct for_handles {
@@ -205,7 +210,11 @@ struct def_expr *make_def_expr(char *id, struct def_params *params,
                                struct expr *body);
 
 struct if_expr *make_if_expr(struct expr *cond_expr, struct expr *then_expr,
-                             struct expr *else_expr);
+                             struct cond_expr *elifs, struct expr *else_expr);
+
+struct cond_expr *make_cond_expr(struct expr *cond, struct expr *then);
+struct cond_expr *append_cond_expr(struct cond_expr *left,
+                                   struct cond_expr *right);
 
 struct for_handles *make_for_handles(char *id);
 struct for_handles *append_for_handles(struct for_handles *left, char *id);
@@ -237,6 +246,7 @@ void free_let_expr(struct let_expr *let_expr);
 void free_def_params(struct def_params *def_params);
 void free_def_expr(struct def_expr *def_expr);
 void free_if_expr(struct if_expr *if_expr);
+void free_cond_expr(struct cond_expr *cond_expr);
 void free_for_handles(struct for_handles *for_handles);
 void free_for_expr(struct for_expr *for_expr);
 void free_reduce_expr(struct reduce_expr *reduce_expr);
