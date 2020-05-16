@@ -14,6 +14,7 @@ programming language, the idea it's to incrementally add new features and make a
 * If-else conditions.
 * List collections (`[expr, expr, expr, ...]`).
 * Map, Filter and Reduce via list comprehensions (`x for x in [1, 2, 3]` and `reduce c + n for n in [1, 2, 3] with c = 0`).
+* Lambda expressions (`let z = lambda x, y = x + y in z(1)`).
 
 ## Work in progress
 
