@@ -1,10 +1,3 @@
 
 def main() =
-  if "hello" == "world" then
-    "equal"
-  elif "hoho" != "hoho" then
-    "hoho"
-  elif "nono" == "nono" then
-    "nono"
-  else
-    "not equal"
+  lambda x, y = x + y

@@ -60,6 +60,7 @@ extern char* strval;
 "else"      { return T_ELSE; }
 "reduce"    { return T_REDUCE; }
 "with"      { return T_WITH; }
+"lambda"    { return T_LAMBDA; }
 
 [a-zA-Z_\$]+[a-zA-Z0-9_]* {
   strval = yytext;

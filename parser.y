@@ -21,7 +21,7 @@ int yyerror(struct scope *scope, char *s);
 %token T_EQ T_NEQ T_GT T_GE T_LT T_LE
 %token T_ANDS T_ORS T_AND T_OR T_XOR T_NOT
 %token T_ADD T_SUB T_MUL T_DIV T_MOD
-%token T_DEF T_LET T_FOR T_IN T_IF T_THEN T_ELSE T_ELIF T_REDUCE T_WITH
+%token T_DEF T_LET T_FOR T_IN T_IF T_THEN T_ELSE T_ELIF T_REDUCE T_WITH T_LAMBDA
 
 %union {
   int token;
@@ -44,6 +44,7 @@ int yyerror(struct scope *scope, char *s);
   struct for_expr *for_expr;
   struct reduce_expr *reduce_expr;
   struct list_expr *list_expr;
+  struct lambda_expr *lambda_expr;
 }
 
 %type<str> id
@@ -65,6 +66,7 @@ int yyerror(struct scope *scope, char *s);
 %type<for_expr> for_expr
 %type<reduce_expr> reduce_expr
 %type<list_expr> list_expr list_items
+%type<lambda_expr> lambda_expr
 
 %parse-param {struct scope *scope}
 
@@ -109,6 +111,7 @@ expr: T_LPAR expr T_RPAR  { $$ = $2; }
     | list_expr           { $$ = make_expr_from_list($1); }
     | for_expr            { $$ = make_expr_from_for($1); }
     | reduce_expr         { $$ = make_expr_from_reduce($1); }
+    | lambda_expr         { $$ = make_expr_from_lambda($1); }
     ;
 
 lit_expr: T_NUMBER { $$ = make_lit_expr(LIT_NUMBER, strdup(strval)); }
@@ -194,6 +197,8 @@ list_items: %empty                    { $$ = NULL; }
           ;
 
 list_expr: T_LSB list_items T_RSB     { $$ = $2; }
+
+lambda_expr: T_LAMBDA def_params T_ASSIGN expr { $$ = make_lambda_expr($2, $4); }
 
 %%
 int main() {

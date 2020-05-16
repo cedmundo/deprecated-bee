@@ -110,6 +110,13 @@ struct expr *make_expr_from_list(struct list_expr *expr) {
   return new_expr;
 }
 
+struct expr *make_expr_from_lambda(struct lambda_expr *expr) {
+  struct expr *new_expr = malloc(sizeof(struct expr));
+  new_expr->type = EXPR_LAMBDA;
+  new_expr->lambda_expr = expr;
+  return new_expr;
+}
+
 struct lit_expr *make_lit_expr(enum lit_type type, char *v) {
   assert(v != NULL);
   struct lit_expr *lit_expr = malloc(sizeof(struct lit_expr));
@@ -360,6 +367,16 @@ struct list_expr *append_list_expr(struct list_expr *left, struct expr *expr) {
   return left;
 }
 
+struct lambda_expr *make_lambda_expr(struct def_params *params,
+                                     struct expr *body) {
+  assert(params != NULL);
+  assert(body != NULL);
+  struct lambda_expr *lambda_expr = malloc(sizeof(struct lambda_expr));
+  lambda_expr->params = params;
+  lambda_expr->body = body;
+  return lambda_expr;
+}
+
 void free_def_exprs(struct def_exprs *def_exprs) {
   assert(def_exprs != NULL);
   if (def_exprs->def_expr != NULL) {
@@ -421,6 +438,12 @@ void free_expr(struct expr *expr) {
       free_list_expr(expr->list_expr);
     }
     free(expr->list_expr);
+    break;
+  case EXPR_LAMBDA:
+    if (expr->lambda_expr != NULL) {
+      free_lambda_expr(expr->lambda_expr);
+    }
+    free(expr->lambda_expr);
     break;
   }
 }
@@ -643,5 +666,17 @@ void free_list_expr(struct list_expr *list_expr) {
   if (list_expr->next != NULL) {
     free_list_expr(list_expr->next);
     free(list_expr->next);
+  }
+}
+
+void free_lambda_expr(struct lambda_expr *lambda_expr) {
+  if (lambda_expr->params != NULL) {
+    free_def_params(lambda_expr->params);
+    free(lambda_expr->params);
+  }
+
+  if (lambda_expr->body != NULL) {
+    free_expr(lambda_expr->body);
+    free(lambda_expr->body);
   }
 }

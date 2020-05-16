@@ -5,7 +5,7 @@
 struct value;
 struct bind;
 struct scope;
-struct function;
+struct script_def;
 struct list;
 typedef void (*native_def)(struct scope *, struct value *value);
 
