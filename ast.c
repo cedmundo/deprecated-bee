@@ -369,7 +369,6 @@ struct list_expr *append_list_expr(struct list_expr *left, struct expr *expr) {
 
 struct lambda_expr *make_lambda_expr(struct def_params *params,
                                      struct expr *body) {
-  assert(params != NULL);
   assert(body != NULL);
   struct lambda_expr *lambda_expr = malloc(sizeof(struct lambda_expr));
   lambda_expr->params = params;

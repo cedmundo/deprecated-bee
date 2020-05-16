@@ -167,8 +167,8 @@ struct value run_call_expr(struct scope *scope, struct call_expr *call_expr) {
   struct scope *forked = scope_fork(scope->global);
   struct value res_within_forked = {.type = TYPE_ERROR};
   if (fun_value.type == TYPE_SCRIPT_FUN) {
-    struct def_expr *def_expr = fun_value.script_fun;
-    struct def_params *recv_param = def_expr->params;
+    struct script_def script_fun = fun_value.script_fun;
+    struct def_params *recv_param = script_fun.params;
     struct call_args *send_param = call_expr->args;
     while (send_param != NULL) {
       if (recv_param == NULL) {
@@ -188,7 +188,7 @@ struct value run_call_expr(struct scope *scope, struct call_expr *call_expr) {
       recv_param = recv_param->next;
     }
 
-    res_within_forked = run_expr(forked, def_expr->body);
+    res_within_forked = run_expr(forked, script_fun.body);
     scope_bind(forked, NULL, res_within_forked, BIND_BORROW);
 
     res = copy_value(scope, res_within_forked);
@@ -258,7 +258,8 @@ struct value run_def_expr(struct scope *scope, struct def_expr *def_expr) {
   assert(def_expr != NULL);
   struct value value;
   value.type = TYPE_SCRIPT_FUN;
-  value.script_fun = def_expr;
+  value.script_fun = (struct script_def){
+      .params = def_expr->params, .body = def_expr->body, .id = def_expr->id};
   scope_bind(scope, def_expr->id, value, BIND_OWNER);
   return value;
 }
@@ -420,6 +421,15 @@ struct value run_list_expr(struct scope *scope, struct list_expr *list_expr) {
   return res;
 }
 
+struct value run_lambda_expr(struct scope *scope, struct lambda_expr *expr) {
+  assert(scope != NULL);
+  struct script_def script_fun = {
+      .params = expr->params, .body = expr->body, .id = NULL};
+  struct value res = {.type = TYPE_SCRIPT_FUN, .script_fun = script_fun};
+  scope_bind(scope, NULL, res, BIND_OWNER);
+  return res;
+}
+
 struct value run_expr(struct scope *scope, struct expr *expr) {
   assert(scope != NULL);
   assert(expr != NULL);
@@ -458,6 +468,9 @@ struct value run_expr(struct scope *scope, struct expr *expr) {
     break;
   case EXPR_REDUCE:
     res = run_reduce_expr(scope, expr->reduce_expr);
+    break;
+  case EXPR_LAMBDA:
+    res = run_lambda_expr(scope, expr->lambda_expr);
     break;
   default:
     make_errorf(res, "unknown expression type: %d", expr->type);
@@ -531,7 +544,11 @@ void print_value(struct value value) {
     printf("unit");
     break;
   case TYPE_SCRIPT_FUN:
-    printf("function");
+    if (value.script_fun.id == NULL) {
+      printf("lambda function");
+    } else {
+      printf("function(%s)", value.script_fun.id);
+    }
     break;
   case TYPE_NATIVE_FUN:
     printf("native function");

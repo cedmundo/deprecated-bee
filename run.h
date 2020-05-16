@@ -9,6 +9,12 @@ struct script_def;
 struct list;
 typedef void (*native_def)(struct scope *, struct value *value);
 
+struct script_def {
+  struct def_params *params;
+  struct expr *body;
+  char *id;
+};
+
 enum type {
   TYPE_UNIT = 1,
   TYPE_STRING = 2,
@@ -24,7 +30,7 @@ struct value {
   union {
     char *str;
     struct list *list;
-    struct def_expr *script_fun;
+    struct script_def script_fun;
     native_def native_fun;
     uint64_t u64;
     int64_t i64;
@@ -51,6 +57,7 @@ struct value run_for_expr(struct scope *scope, struct for_expr *for_expr);
 struct value run_reduce_expr(struct scope *scope,
                              struct reduce_expr *reduce_expr);
 struct value run_list_expr(struct scope *scope, struct list_expr *expr);
+struct value run_lambda_expr(struct scope *scope, struct lambda_expr *expr);
 struct value run_expr(struct scope *scope, struct expr *expr);
 
 void run_all_def_exprs(struct scope *scope, struct def_exprs *def_exprs);
