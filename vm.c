@@ -117,18 +117,33 @@ struct object *vm_alloc(struct vm *vm, bool is_root) {
 
 size_t object_free(struct object *obj) {
   assert(obj != NULL);
-  size_t hf, tf;
   switch (obj->type) {
   case TYPE_STRING:
   case TYPE_ERROR:
     free(obj->string);
     break;
-  case TYPE_PAIR:
-    hf = object_free(obj->pair.head);
-    tf = object_free(obj->pair.tail);
+  case TYPE_PAIR: {
+    size_t hf = object_free(obj->pair.head);
+    size_t tf = object_free(obj->pair.tail);
     free(obj->pair.head);
     free(obj->pair.tail);
     return hf + tf;
+  }
+  case TYPE_LIST: {
+    struct list *cur = obj->list;
+    struct list *tmp = NULL;
+    size_t total = 0LL;
+    while (cur != NULL) {
+      tmp = cur->next;
+      if (cur->item != NULL) {
+        total += object_free(cur->item);
+      }
+
+      free(cur);
+      cur = tmp;
+    }
+    return total;
+  }
   case TYPE_FUNCTION:
   case TYPE_UNIT:
   case TYPE_NIL:
@@ -158,7 +173,67 @@ size_t object_mark(struct object *obj) {
     return hm + tm;
   }
 
+  if (obj->type == TYPE_LIST) {
+    size_t tm = 0LL;
+    struct list *cur = obj->list;
+    while (cur != NULL) {
+      tm += object_mark(cur->item);
+      cur = cur->next;
+    }
+  }
+
   return 1;
+}
+
+void object_print(struct object *value) {
+  switch (value->type) {
+  case TYPE_NIL:
+    printf("nil");
+    break;
+  case TYPE_UNIT:
+    printf("unit");
+    break;
+  case TYPE_FUNCTION:
+    printf("function");
+    break;
+  case TYPE_BOL:
+    printf("bol(%d)", value->bol);
+    break;
+  case TYPE_U64:
+    printf("u64(%lu)", value->u64);
+    break;
+  case TYPE_I64:
+    printf("i64(%ld)", value->i64);
+    break;
+  case TYPE_F64:
+    printf("f64(%lf)", value->f64);
+    break;
+  case TYPE_STRING:
+    printf("string('%s')", value->string);
+    break;
+  case TYPE_PAIR:
+    printf("pair(");
+    object_print(value->pair.head);
+    printf(",");
+    object_print(value->pair.tail);
+    printf(")");
+    break;
+  case TYPE_LIST:
+    printf("list[");
+    struct list *item = value->list;
+    while (item != NULL) {
+      object_print(item->item);
+      item = item->next;
+      if (item != NULL) {
+        printf(",");
+      }
+    }
+    printf("]");
+    break;
+  case TYPE_ERROR:
+    printf("error('%s')", value->string);
+    break;
+  }
 }
 
 void enclosing_init(struct enclosing *e, struct vm *vm,
@@ -185,6 +260,9 @@ void enclosing_free(struct enclosing *e) {
     free(cur);
     cur = tmp;
   }
+
+  e->head = NULL;
+  e->tail = NULL;
 }
 
 void enclosing_bind(struct enclosing *e, struct object *object, char *id) {
@@ -229,8 +307,18 @@ struct bind *enclosing_find(struct enclosing *e, char *id) {
 
 struct object *vm_run_main(struct vm *vm) {
   assert(vm != NULL);
-  // TODO: implement
-  return NULL;
+
+  struct enclosing main_enclosing;
+  enclosing_init(&main_enclosing, vm, &vm->globals);
+
+  struct call_expr main_call = {
+      .callee = "main",
+      .args = NULL,
+  };
+  struct object *res = vm_run_call(&main_enclosing, &main_call);
+
+  enclosing_free(&main_enclosing);
+  return res;
 }
 
 void vm_define_all(struct vm *vm, struct def_exprs *defs) {
@@ -359,6 +447,274 @@ struct object *vm_run_unit(struct enclosing *encl,
   return res;
 }
 
+struct object *vm_run_let(struct enclosing *encl, struct let_expr *let_expr) {
+  assert(encl != NULL);
+  assert(let_expr != NULL);
+  struct enclosing forked;
+  enclosing_init(&forked, encl->vm, encl);
+
+  struct let_assigns *assign = let_expr->assigns;
+  while (assign != NULL) {
+    struct object *object = vm_run_expr(encl, assign->expr);
+    enclosing_bind(&forked, object, strdup(assign->id));
+    assign = assign->next;
+  }
+
+  struct object *res = vm_run_expr(&forked, let_expr->in_expr);
+  enclosing_free(&forked);
+  return res;
+}
+
+struct object *vm_run_call(struct enclosing *encl,
+                           struct call_expr *call_expr) {
+  assert(encl != NULL);
+  assert(call_expr != NULL);
+
+  struct object *res = NULL;
+  // resolve function
+  struct bind *fun_bind = enclosing_find(encl, call_expr->callee);
+  if (fun_bind == NULL) {
+    struct object *res = vm_alloc(encl->vm, false);
+    make_errorf(res, "undefined function '%s'", call_expr->callee);
+    return res;
+  }
+
+  struct enclosing forked;
+  enclosing_init(&forked, encl->vm, encl);
+  struct object *fun_object = fun_bind->object;
+  struct function function = fun_object->function;
+  if (function.target == TARGET_SCRIPT) {
+    struct def_params *recv_param = function.params;
+    struct call_args *send_param = call_expr->args;
+    while (send_param != NULL) {
+      if (recv_param == NULL) {
+        enclosing_free(&forked);
+
+        res = vm_alloc(encl->vm, false);
+        make_errorf(res, "%s expects more arguments", call_expr->callee);
+        return res;
+      }
+
+      struct object *arg_value = vm_run_expr(encl, send_param->expr);
+      enclosing_bind(&forked, arg_value, strdup(recv_param->id));
+      send_param = send_param->next;
+      recv_param = recv_param->next;
+    }
+
+    res = vm_run_expr(&forked, function.body);
+    enclosing_free(&forked);
+    return res;
+  } else {
+    native_fun callee = function.native_call;
+    struct call_args *send_param = call_expr->args;
+    struct list *params_head = NULL;
+    struct list *params_tail = NULL;
+
+    while (send_param != NULL) {
+      struct list *item = malloc(sizeof(struct list));
+      item->next = NULL;
+      item->item = vm_run_expr(encl, send_param->expr);
+
+      if (params_head == NULL) {
+        params_head = item;
+      }
+
+      if (params_tail != NULL) {
+        params_tail->next = item;
+      }
+
+      params_tail = item;
+      send_param = send_param->next;
+    }
+
+    struct enclosing forked;
+    enclosing_init(&forked, encl->vm, &encl->vm->globals);
+    struct object *args = vm_alloc(encl->vm, false);
+    args->type = TYPE_LIST;
+    args->list = params_head;
+
+    enclosing_bind(&forked, args, strdup("args"));
+    res = callee(&forked);
+    enclosing_free(&forked);
+    return res;
+  }
+}
+
+struct object *vm_run_if(struct enclosing *encl, struct if_expr *if_expr) {
+  assert(encl != NULL);
+  assert(if_expr != NULL);
+
+  struct object *res;
+  struct cond_expr *cur_cond = if_expr->conds;
+  while (cur_cond != NULL) {
+    struct object *cond_res = vm_run_expr(encl, cur_cond->cond);
+    if (cond_res->type == TYPE_UNIT) {
+      res = vm_alloc(encl->vm, false);
+      make_error(res, "cannot evaluate condition for unit type");
+      return res;
+    }
+
+    if (cond_res->u64) {
+      res = vm_run_expr(encl, cur_cond->then);
+      return res;
+    }
+
+    cur_cond = cur_cond->next;
+  }
+
+  res = vm_run_expr(encl, if_expr->else_expr);
+  return res;
+}
+
+struct object *vm_run_list(struct enclosing *encl,
+                           struct list_expr *list_expr) {
+  assert(encl != NULL);
+
+  struct list_expr *cur = list_expr;
+  struct list *head = NULL;
+  struct list *tail = NULL;
+  while (cur != NULL) {
+    struct list *item = malloc(sizeof(struct list));
+    item->next = NULL;
+    item->item = vm_run_expr(encl, cur->item);
+
+    if (head == NULL) {
+      head = item;
+    }
+
+    if (tail != NULL) {
+      tail->next = item;
+    }
+
+    tail = item;
+    cur = cur->next;
+  }
+
+  struct object *res = vm_alloc(encl->vm, false);
+  res->type = TYPE_LIST;
+  res->list = head;
+  return res;
+}
+
+struct object *vm_run_for(struct enclosing *encl, struct for_expr *for_expr) {
+  assert(encl != NULL);
+  assert(for_expr != NULL);
+  struct list *res_head = NULL;
+  struct list *res_tail = NULL;
+
+  struct object *iterator_value = vm_run_expr(encl, for_expr->iterator_expr);
+  if (iterator_value->type == TYPE_LIST) {
+    struct list *cur_item = iterator_value->list;
+    while (cur_item != NULL) {
+      struct enclosing forked;
+      enclosing_init(&forked, encl->vm, encl);
+
+      char *item_handle_id =
+          for_expr->handle_expr->id; // only one iterator handler is supported
+      enclosing_bind(&forked, cur_item->item, strdup(item_handle_id));
+
+      if (for_expr->filter_expr != NULL) {
+        struct object *filter_value =
+            vm_run_expr(&forked, for_expr->filter_expr);
+        if (filter_value->type != TYPE_ERROR &&
+            filter_value->type != TYPE_FUNCTION && filter_value->u64 == 0) {
+          cur_item = cur_item->next;
+          enclosing_free(&forked);
+          continue;
+        }
+      }
+
+      struct object *iteration_value =
+          vm_run_expr(&forked, for_expr->iteration_expr);
+      struct list *new_item = malloc(sizeof(struct list));
+      new_item->next = NULL;
+      new_item->item = iteration_value;
+
+      if (res_head == NULL) {
+        res_head = new_item;
+      }
+
+      if (res_tail != NULL) {
+        res_tail->next = new_item;
+      }
+
+      res_tail = new_item;
+      enclosing_free(&forked);
+      cur_item = cur_item->next;
+    }
+  } else {
+    struct object *res = vm_alloc(encl->vm, false);
+    make_errorf(res, "cannot iterate over type %d", iterator_value->type);
+    return res;
+  }
+
+  struct object *res = vm_alloc(encl->vm, false);
+  res->type = TYPE_LIST;
+  res->list = res_head;
+  return res;
+}
+
+struct object *vm_run_reduce(struct enclosing *encl,
+                             struct reduce_expr *reduce_expr) {
+  assert(encl != NULL);
+  assert(reduce_expr != NULL);
+  struct for_expr *for_expr = reduce_expr->for_expr;
+  struct object *iterator_value = vm_run_expr(encl, for_expr->iterator_expr);
+  struct object *carry = vm_run_expr(encl, reduce_expr->value);
+
+  if (iterator_value->type == TYPE_LIST) {
+    struct list *cur_item = iterator_value->list;
+    while (cur_item != NULL) {
+      struct enclosing forked;
+      enclosing_init(&forked, encl->vm, encl);
+
+      char *item_handle_id =
+          for_expr->handle_expr->id; // only one iterator handler is supported
+      enclosing_bind(&forked, cur_item->item, strdup(item_handle_id));
+      enclosing_bind(&forked, carry, strdup(reduce_expr->id));
+
+      if (for_expr->filter_expr != NULL) {
+        struct object *filter_value =
+            vm_run_expr(&forked, for_expr->filter_expr);
+        if (filter_value->type != TYPE_ERROR &&
+            filter_value->type != TYPE_FUNCTION && filter_value->u64 == 0) {
+          cur_item = cur_item->next;
+          // enclosing_free(&forked);
+          continue;
+        }
+      }
+
+      carry = vm_run_expr(&forked, for_expr->iteration_expr);
+      enclosing_free(&forked);
+      cur_item = cur_item->next;
+    }
+  } else {
+    struct object *res = vm_alloc(encl->vm, false);
+    make_errorf(res, "cannot iterate over type %d", iterator_value->type);
+    return res;
+  }
+
+  return carry;
+}
+
+struct object *vm_run_lambda(struct enclosing *encl,
+                             struct lambda_expr *lambda_expr) {
+  assert(encl != NULL);
+  assert(lambda_expr != NULL);
+
+  struct object *object = vm_alloc(encl->vm, false);
+  object->type = TYPE_FUNCTION;
+  object->function = (struct function){
+      .target = TARGET_SCRIPT,
+      .native_call = NULL,
+      .params = lambda_expr->params,
+      .body = lambda_expr->body,
+      .id = NULL,
+  };
+
+  return object;
+}
+
 struct object *vm_run_expr(struct enclosing *encl, struct expr *expr) {
   assert(encl != NULL);
   assert(expr != NULL);
@@ -377,30 +733,30 @@ struct object *vm_run_expr(struct enclosing *encl, struct expr *expr) {
   case EXPR_UNIT:
     res = vm_run_unit(encl, expr->unit_expr);
     break;
-    // case EXPR_LET:
-    //   res = run_let_expr(scope, expr->let_expr);
-    //   break;
-    // case EXPR_CALL:
-    //   res = run_call_expr(scope, expr->call_expr);
-    //   break;
-    // case EXPR_IF:
-    //   res = run_if_expr(scope, expr->if_expr);
-    //   break;
-    // case EXPR_LIST:
-    //   res = run_list_expr(scope, expr->list_expr);
-    //   break;
-    // case EXPR_FOR:
-    //   res = run_for_expr(scope, expr->for_expr);
-    //   break;
-    // case EXPR_REDUCE:
-    //   res = run_reduce_expr(scope, expr->reduce_expr);
-    //   break;
-    // case EXPR_LAMBDA:
-    //   res = run_lambda_expr(scope, expr->lambda_expr);
-    //   break;
-    // case EXPR_DEF:
-    //   res = run_def_expr(scope, expr->def_expr);
-    //   break;
+  case EXPR_LET:
+    res = vm_run_let(encl, expr->let_expr);
+    break;
+  case EXPR_CALL:
+    res = vm_run_call(encl, expr->call_expr);
+    break;
+  case EXPR_IF:
+    res = vm_run_if(encl, expr->if_expr);
+    break;
+  case EXPR_LIST:
+    res = vm_run_list(encl, expr->list_expr);
+    break;
+  case EXPR_FOR:
+    res = vm_run_for(encl, expr->for_expr);
+    break;
+  case EXPR_REDUCE:
+    res = vm_run_reduce(encl, expr->reduce_expr);
+    break;
+  case EXPR_LAMBDA:
+    res = vm_run_lambda(encl, expr->lambda_expr);
+    break;
+  case EXPR_DEF:
+    res = vm_run_def(encl->vm, expr->def_expr);
+    break;
   }
 
   return res;

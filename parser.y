@@ -205,6 +205,8 @@ int main() {
   vm_init(&vm);
 
   int res = yyparse(&vm);
+  struct object *result = vm_run_main(&vm);
+  object_print(result);
 
   vm_free(&vm);
   return res;

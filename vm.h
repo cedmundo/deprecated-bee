@@ -7,12 +7,18 @@
 
 struct vm;
 struct object;
+struct enclosing;
 struct pair {
   struct object *head;
   struct object *tail;
 };
 
-typedef void (*native_fun)(struct vm *vm);
+struct list {
+  struct list *next;
+  struct object *item;
+};
+
+typedef struct object *(*native_fun)(struct enclosing *);
 
 enum function_target { TARGET_SCRIPT, TARGET_NATIVE };
 struct function {
@@ -34,6 +40,7 @@ enum object_type {
   TYPE_ERROR,
   TYPE_STRING,
   TYPE_PAIR,
+  TYPE_LIST,
   TYPE_FUNCTION,
 };
 
@@ -46,6 +53,7 @@ struct object {
     double f64;
     char *error;
     char *string;
+    struct list *list;
     struct pair pair;
     struct function function;
   };
@@ -84,6 +92,7 @@ size_t vm_gc(struct vm *vm);
 struct object *vm_alloc(struct vm *vm, bool is_root);
 size_t object_free(struct object *obj);
 size_t object_mark(struct object *obj);
+void object_print(struct object *obj);
 
 void enclosing_init(struct enclosing *e, struct vm *vm,
                     struct enclosing *parent);
@@ -100,6 +109,15 @@ struct object *vm_run_lookup(struct enclosing *encl,
                              struct lookup_expr *lookup_expr);
 struct object *vm_run_bin(struct enclosing *encl, struct bin_expr *bin_expr);
 struct object *vm_run_unit(struct enclosing *encl, struct unit_expr *unit_expr);
+struct object *vm_run_let(struct enclosing *encl, struct let_expr *let_expr);
+struct object *vm_run_call(struct enclosing *encl, struct call_expr *call_expr);
+struct object *vm_run_if(struct enclosing *encl, struct if_expr *if_expr);
+struct object *vm_run_list(struct enclosing *encl, struct list_expr *list_expr);
+struct object *vm_run_for(struct enclosing *encl, struct for_expr *for_expr);
+struct object *vm_run_reduce(struct enclosing *encl,
+                             struct reduce_expr *reduce_expr);
+struct object *vm_run_lambda(struct enclosing *encl,
+                             struct lambda_expr *lambda_expr);
 struct object *vm_run_expr(struct enclosing *encl, struct expr *expr);
 
 #define DEFAULT_GC_INTERVAL_NS 100000

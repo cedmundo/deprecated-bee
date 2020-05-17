@@ -1,3 +1,4 @@
 
 def main() =
-  let x = lambda who = "hello " + who in x("world")
+  let sayHello = lambda who = "hello " + who + "!" in
+    sayHello("world")
