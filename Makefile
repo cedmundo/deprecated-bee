@@ -1,7 +1,7 @@
 CC 	= cc
 CFLAGS 	= -g -Wall -std=c11 -I. -I/usr/include
-HEADERS	= ast.h run.h scope.h builtins.h binops.h
-OBJ 	= ast.o run.o scope.o builtins.o binops.o y.tab.o lex.yy.o
+HEADERS	= ast.h vm.h
+OBJ 	= ast.o vm.o y.tab.o lex.yy.o
 YACC 	= bison
 YFLAGS 	= -y -d
 LEX 	= lex

@@ -5,15 +5,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct scope;
+struct vm;
 #include "y.tab.h"
 #include "ast.h"
-#include "run.h"
-#include "scope.h"
+#include "vm.h"
 
 extern int yylex();
 char *strval;
-int yyerror(struct scope *scope, char *s);
+int yyerror(struct vm *vm, char *s);
 %}
 %start program
 %token T_ID T_STRING T_NUMBER
@@ -68,7 +67,7 @@ int yyerror(struct scope *scope, char *s);
 %type<list_expr> list_expr list_items
 %type<lambda_expr> lambda_expr
 
-%parse-param {struct scope *scope}
+%parse-param {struct vm *vm}
 
 %nonassoc ELIFX
 
@@ -91,7 +90,7 @@ int yyerror(struct scope *scope, char *s);
 %left T_DEF
 %%
 
-program: def_exprs { run_all_def_exprs(scope, $1); }
+program: def_exprs { vm_define_all(vm, $1); }
 
 def_exprs: def_expr             { $$ = make_def_exprs($1); }
          | def_exprs def_expr   { $$ = append_def_exprs($1, $2); }
@@ -202,18 +201,16 @@ lambda_expr: T_LAMBDA def_params T_ASSIGN expr { $$ = make_lambda_expr($2, $4); 
 
 %%
 int main() {
-  struct scope *globals = malloc(sizeof(struct scope));
-  scope_init(globals);
-  globals->global = globals; // Weird but needed
-  scope_builtins(globals);
-  int res = yyparse(globals);
-  run_main(globals);
-  scope_leave(globals);
-  free(globals);
+  struct vm vm;
+  vm_init(&vm);
+
+  int res = yyparse(&vm);
+
+  vm_free(&vm);
   return res;
 }
 
-int yyerror(struct scope *scope, char *s) {
+int yyerror(struct vm *vm, char *s) {
   fprintf(stderr, "%s\n",s);
   return 0;
 }
