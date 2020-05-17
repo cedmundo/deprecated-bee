@@ -60,6 +60,7 @@ struct bind {
 };
 
 struct enclosing {
+  struct vm *vm;
   struct enclosing *parent;
   struct bind *head;
   struct bind *tail;
@@ -84,7 +85,8 @@ struct object *vm_alloc(struct vm *vm, bool is_root);
 size_t object_free(struct object *obj);
 size_t object_mark(struct object *obj);
 
-void enclosing_init(struct enclosing *e, struct enclosing *parent);
+void enclosing_init(struct enclosing *e, struct vm *vm,
+                    struct enclosing *parent);
 void enclosing_free(struct enclosing *e);
 void enclosing_bind(struct enclosing *e, struct object *object, char *id);
 struct bind *enclosing_find(struct enclosing *e, char *id);
@@ -93,4 +95,26 @@ void vm_define_all(struct vm *vm, struct def_exprs *defs);
 struct object *vm_run_main(struct vm *vm);
 struct object *vm_run_def(struct vm *vm, struct def_expr *def);
 
+struct object *vm_run_lit(struct enclosing *encl, struct lit_expr *lit_expr);
+struct object *vm_run_lookup(struct enclosing *encl,
+                             struct lookup_expr *lookup_expr);
+struct object *vm_run_bin(struct enclosing *encl, struct bin_expr *bin_expr);
+struct object *vm_run_unit(struct enclosing *encl, struct unit_expr *unit_expr);
+struct object *vm_run_expr(struct enclosing *encl, struct expr *expr);
+
 #define DEFAULT_GC_INTERVAL_NS 100000
+#define make_error(res, msg)                                                   \
+  do {                                                                         \
+    res->type = TYPE_ERROR;                                                    \
+    res->error = malloc(sizeof(char) * 200);                                   \
+    memset(res->error, 0L, sizeof(char) * 200);                                \
+    sprintf(res->error, "error: %s", msg);                                     \
+  } while (0);
+
+#define make_errorf(res, msg, ...)                                             \
+  do {                                                                         \
+    res->type = TYPE_ERROR;                                                    \
+    res->error = malloc(sizeof(char) * 200);                                   \
+    memset(res->error, 0L, sizeof(char) * 200);                                \
+    sprintf(res->error, "error: " msg, __VA_ARGS__);                           \
+  } while (0);

@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include "vm.h"
 #include "ast.h"
+#include "binops.h"
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -12,7 +13,7 @@ void vm_init(struct vm *vm) {
   vm->heap_head = NULL;
   vm->heap_tail = NULL;
   vm->source_exprs = NULL;
-  enclosing_init(&vm->globals, NULL);
+  enclosing_init(&vm->globals, vm, NULL);
   timespec_get(&vm->last_gc, TIME_UTC);
 }
 
@@ -110,7 +111,7 @@ struct object *vm_alloc(struct vm *vm, bool is_root) {
   }
 
   vm->heap_tail = obj;
-  vm_gc(vm);
+  // vm_gc(vm);
   return obj;
 }
 
@@ -160,11 +161,13 @@ size_t object_mark(struct object *obj) {
   return 1;
 }
 
-void enclosing_init(struct enclosing *e, struct enclosing *parent) {
+void enclosing_init(struct enclosing *e, struct vm *vm,
+                    struct enclosing *parent) {
   assert(e != NULL);
+  e->vm = vm;
+  e->parent = parent;
   e->head = NULL;
   e->tail = NULL;
-  e->parent = parent;
 }
 
 void enclosing_free(struct enclosing *e) {
@@ -259,4 +262,146 @@ struct object *vm_run_def(struct vm *vm, struct def_expr *def) {
   };
 
   return object;
+}
+
+struct object *vm_run_lit(struct enclosing *encl, struct lit_expr *lit_expr) {
+  assert(encl != NULL);
+  assert(lit_expr != NULL);
+
+  struct object *res = vm_alloc(encl->vm, false);
+  if (lit_expr->type == LIT_STRING) {
+    res->type = TYPE_STRING;
+    size_t quoted_size = strlen(lit_expr->raw_value);
+    res->string = strndup(lit_expr->raw_value + 1, quoted_size - 2);
+  } else {
+    if (strstr(lit_expr->raw_value, ".") != NULL) {
+      res->type = TYPE_F64;
+      res->f64 = strtod(lit_expr->raw_value, NULL);
+    } else {
+      res->type = TYPE_I64;
+      res->i64 = strtol(lit_expr->raw_value, NULL, 10);
+    }
+  }
+
+  return res;
+}
+
+struct object *vm_run_lookup(struct enclosing *encl,
+                             struct lookup_expr *lookup_expr) {
+  assert(encl != NULL);
+  assert(lookup_expr != NULL);
+
+  if (lookup_expr->type == LOOKUP_ID) {
+    struct bind *bind = enclosing_find(encl, lookup_expr->id);
+    if (bind == NULL) {
+      struct object *res = vm_alloc(encl->vm, false);
+      make_errorf(res, "undefined variable '%s'", lookup_expr->id);
+      return res;
+    }
+
+    return bind->object;
+  } else {
+    assert(lookup_expr->object != NULL);
+    assert(lookup_expr->key != NULL);
+  }
+
+  return NULL;
+}
+
+struct object *vm_run_bin(struct enclosing *encl, struct bin_expr *bin_expr) {
+  assert(encl != NULL);
+  assert(bin_expr != NULL);
+  struct object *left = vm_run_expr(encl, bin_expr->left);
+  struct object *right = vm_run_expr(encl, bin_expr->right);
+  return handle_bin_op(encl->vm, left, right, bin_expr->op);
+}
+
+struct object *vm_run_unit(struct enclosing *encl,
+                           struct unit_expr *unit_expr) {
+  assert(encl != NULL);
+  assert(unit_expr != NULL);
+  struct object *res = vm_alloc(encl->vm, false);
+  struct object *right = vm_run_expr(encl, unit_expr->right);
+  if (unit_expr->op == OP_NEG) {
+    switch (right->type) {
+    case TYPE_U64:
+    case TYPE_I64:
+      res->type = TYPE_I64;
+      res->i64 = -right->i64;
+      break;
+    case TYPE_F64:
+      res->type = TYPE_F64;
+      res->f64 = -right->f64;
+      break;
+    default:
+      make_error(res, "unsupported operation for type");
+      break;
+    }
+  } else if (unit_expr->op == OP_NOT) {
+    switch (right->type) {
+    case TYPE_U64:
+    case TYPE_I64:
+      res->type = TYPE_I64;
+      res->i64 = !right->i64;
+      break;
+    case TYPE_F64:
+      res->type = TYPE_F64;
+      res->f64 = !right->f64;
+      break;
+    default:
+      make_error(res, "unsupported operation for type");
+      break;
+    }
+  } else {
+    make_error(res, "unrecognized unitary operation");
+  }
+
+  return res;
+}
+
+struct object *vm_run_expr(struct enclosing *encl, struct expr *expr) {
+  assert(encl != NULL);
+  assert(expr != NULL);
+
+  struct object *res = NULL;
+  switch (expr->type) {
+  case EXPR_LIT:
+    res = vm_run_lit(encl, expr->lit_expr);
+    break;
+  case EXPR_LOOKUP:
+    res = vm_run_lookup(encl, expr->lookup_expr);
+    break;
+  case EXPR_BIN:
+    res = vm_run_bin(encl, expr->bin_expr);
+    break;
+  case EXPR_UNIT:
+    res = vm_run_unit(encl, expr->unit_expr);
+    break;
+    // case EXPR_LET:
+    //   res = run_let_expr(scope, expr->let_expr);
+    //   break;
+    // case EXPR_CALL:
+    //   res = run_call_expr(scope, expr->call_expr);
+    //   break;
+    // case EXPR_IF:
+    //   res = run_if_expr(scope, expr->if_expr);
+    //   break;
+    // case EXPR_LIST:
+    //   res = run_list_expr(scope, expr->list_expr);
+    //   break;
+    // case EXPR_FOR:
+    //   res = run_for_expr(scope, expr->for_expr);
+    //   break;
+    // case EXPR_REDUCE:
+    //   res = run_reduce_expr(scope, expr->reduce_expr);
+    //   break;
+    // case EXPR_LAMBDA:
+    //   res = run_lambda_expr(scope, expr->lambda_expr);
+    //   break;
+    // case EXPR_DEF:
+    //   res = run_def_expr(scope, expr->def_expr);
+    //   break;
+  }
+
+  return res;
 }
