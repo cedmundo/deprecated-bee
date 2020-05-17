@@ -679,7 +679,7 @@ struct object *vm_run_reduce(struct enclosing *encl,
         if (filter_value->type != TYPE_ERROR &&
             filter_value->type != TYPE_FUNCTION && filter_value->u64 == 0) {
           cur_item = cur_item->next;
-          // enclosing_free(&forked);
+          enclosing_free(&forked);
           continue;
         }
       }
