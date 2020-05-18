@@ -9,6 +9,8 @@
 struct object *handle_i64_u64(struct vm *vm, struct object *left,
                               struct object *right, enum bin_op op) {
   struct object *res = vm_alloc(vm, false);
+  res->type = TYPE_I64;
+
   switch (op) {
   case OP_ADD:
     res->i64 = left->i64 + right->u64;
@@ -65,6 +67,8 @@ struct object *handle_i64_u64(struct vm *vm, struct object *left,
 struct object *handle_i64_i64(struct vm *vm, struct object *left,
                               struct object *right, enum bin_op op) {
   struct object *res = vm_alloc(vm, false);
+  res->type = TYPE_I64;
+
   switch (op) {
   case OP_ADD:
     res->i64 = left->i64 + right->i64;
@@ -121,6 +125,8 @@ struct object *handle_i64_i64(struct vm *vm, struct object *left,
 struct object *handle_i64_f64(struct vm *vm, struct object *left,
                               struct object *right, enum bin_op op) {
   struct object *res = vm_alloc(vm, false);
+  res->type = TYPE_F64;
+
   switch (op) {
   case OP_ADD:
     res->f64 = left->i64 + right->f64;
@@ -167,6 +173,8 @@ struct object *handle_i64_f64(struct vm *vm, struct object *left,
 struct object *handle_i64_str(struct vm *vm, struct object *left,
                               struct object *right, enum bin_op op) {
   struct object *res = vm_alloc(vm, false);
+  res->type = TYPE_STRING;
+
   if (op != OP_ADD) {
     make_error(res, "undefined operation between i64 and f64");
     return res;
@@ -188,6 +196,8 @@ struct object *handle_i64_str(struct vm *vm, struct object *left,
 struct object *handle_u64_u64(struct vm *vm, struct object *left,
                               struct object *right, enum bin_op op) {
   struct object *res = vm_alloc(vm, false);
+  res->type = TYPE_U64;
+
   switch (op) {
   case OP_ADD:
     res->u64 = left->u64 + right->u64;
@@ -244,6 +254,8 @@ struct object *handle_u64_u64(struct vm *vm, struct object *left,
 struct object *handle_u64_i64(struct vm *vm, struct object *left,
                               struct object *right, enum bin_op op) {
   struct object *res = vm_alloc(vm, false);
+  res->type = TYPE_I64;
+
   switch (op) {
   case OP_ADD:
     res->u64 = left->u64 + right->i64;
@@ -300,6 +312,8 @@ struct object *handle_u64_i64(struct vm *vm, struct object *left,
 struct object *handle_u64_f64(struct vm *vm, struct object *left,
                               struct object *right, enum bin_op op) {
   struct object *res = vm_alloc(vm, false);
+  res->type = TYPE_F64;
+
   switch (op) {
   case OP_ADD:
     res->f64 = left->u64 + right->f64;
@@ -346,6 +360,8 @@ struct object *handle_u64_f64(struct vm *vm, struct object *left,
 struct object *handle_u64_str(struct vm *vm, struct object *left,
                               struct object *right, enum bin_op op) {
   struct object *res = vm_alloc(vm, false);
+  res->type = TYPE_STRING;
+
   if (op != OP_ADD) {
     make_error(res, "undefined operation between u64 and string");
     return res;
@@ -366,6 +382,8 @@ struct object *handle_u64_str(struct vm *vm, struct object *left,
 struct object *handle_f64_u64(struct vm *vm, struct object *left,
                               struct object *right, enum bin_op op) {
   struct object *res = vm_alloc(vm, false);
+  res->type = TYPE_F64;
+
   switch (op) {
   case OP_ADD:
     res->f64 = left->f64 + right->u64;
@@ -412,6 +430,8 @@ struct object *handle_f64_u64(struct vm *vm, struct object *left,
 struct object *handle_f64_i64(struct vm *vm, struct object *left,
                               struct object *right, enum bin_op op) {
   struct object *res = vm_alloc(vm, false);
+  res->type = TYPE_F64;
+
   switch (op) {
   case OP_ADD:
     res->f64 = left->f64 + right->i64;
@@ -458,6 +478,8 @@ struct object *handle_f64_i64(struct vm *vm, struct object *left,
 struct object *handle_f64_f64(struct vm *vm, struct object *left,
                               struct object *right, enum bin_op op) {
   struct object *res = vm_alloc(vm, false);
+  res->type = TYPE_F64;
+
   switch (op) {
   case OP_ADD:
     res->f64 = left->f64 + right->f64;
@@ -504,6 +526,8 @@ struct object *handle_f64_f64(struct vm *vm, struct object *left,
 struct object *handle_f64_str(struct vm *vm, struct object *left,
                               struct object *right, enum bin_op op) {
   struct object *res = vm_alloc(vm, false);
+  res->type = TYPE_STRING;
+
   if (op != OP_ADD) {
     make_error(res, "undefined operation between f64 and string");
     return res;
@@ -524,6 +548,8 @@ struct object *handle_f64_str(struct vm *vm, struct object *left,
 struct object *handle_str_u64(struct vm *vm, struct object *left,
                               struct object *right, enum bin_op op) {
   struct object *res = vm_alloc(vm, false);
+  res->type = TYPE_STRING;
+
   if (op != OP_ADD) {
     make_error(res, "undefined operation between string and u64");
     return res;
@@ -543,6 +569,8 @@ struct object *handle_str_u64(struct vm *vm, struct object *left,
 struct object *handle_str_i64(struct vm *vm, struct object *left,
                               struct object *right, enum bin_op op) {
   struct object *res = vm_alloc(vm, false);
+  res->type = TYPE_STRING;
+
   if (op != OP_ADD) {
     make_error(res, "undefined operation between string and i64");
     return res;
@@ -562,6 +590,8 @@ struct object *handle_str_i64(struct vm *vm, struct object *left,
 struct object *handle_str_f64(struct vm *vm, struct object *left,
                               struct object *right, enum bin_op op) {
   struct object *res = vm_alloc(vm, false);
+  res->type = TYPE_STRING;
+
   if (op != OP_ADD) {
     make_error(res, "undefined operation between string and f64");
     return res;
