@@ -92,7 +92,7 @@ size_t vm_gc(struct vm *vm);
 struct object *vm_alloc(struct vm *vm, bool is_root);
 size_t object_free(struct object *obj);
 size_t object_mark(struct object *obj);
-void object_print(struct object *obj);
+size_t object_print(struct object *value, bool debug);
 
 void enclosing_init(struct enclosing *e, struct vm *vm,
                     struct enclosing *parent);

@@ -2,6 +2,7 @@
 #include "vm.h"
 #include "ast.h"
 #include "binops.h"
+#include "builtins.h"
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -14,6 +15,7 @@ void vm_init(struct vm *vm) {
   vm->heap_tail = NULL;
   vm->source_exprs = NULL;
   enclosing_init(&vm->globals, vm, NULL);
+  setup_builtins(&vm->globals);
   timespec_get(&vm->last_gc, TIME_UTC);
 }
 
@@ -135,10 +137,6 @@ size_t object_free(struct object *obj) {
     size_t total = 0LL;
     while (cur != NULL) {
       tmp = cur->next;
-      if (cur->item != NULL) {
-        total += object_free(cur->item);
-      }
-
       free(cur);
       cur = tmp;
     }
@@ -185,55 +183,82 @@ size_t object_mark(struct object *obj) {
   return 1;
 }
 
-void object_print(struct object *value) {
+size_t object_print(struct object *value, bool debug) {
+  size_t wbytes = 0LL;
   switch (value->type) {
   case TYPE_NIL:
-    printf("nil");
+    wbytes += printf("nil");
     break;
   case TYPE_UNIT:
-    printf("unit");
+    wbytes += printf("unit");
     break;
   case TYPE_FUNCTION:
-    printf("function");
+    wbytes += printf("function");
     break;
   case TYPE_BOL:
-    printf("bol(%d)", value->bol);
+    if (debug) {
+      wbytes += printf("bol(%d)", value->bol);
+    } else {
+      wbytes += printf(value->bol ? "true" : "false");
+    }
     break;
   case TYPE_U64:
-    printf("u64(%lu)", value->u64);
+    if (debug) {
+      wbytes += printf("u64(%lu)", value->u64);
+    } else {
+      wbytes += printf("%lu", value->u64);
+    }
     break;
   case TYPE_I64:
-    printf("i64(%ld)", value->i64);
+    if (debug) {
+      wbytes += printf("i64(%ld)", value->i64);
+    } else {
+      wbytes += printf("%ld", value->i64);
+    }
     break;
   case TYPE_F64:
-    printf("f64(%lf)", value->f64);
+    if (debug) {
+      wbytes += printf("f64(%lf)", value->f64);
+    } else {
+      wbytes += printf("%lf", value->f64);
+    }
     break;
   case TYPE_STRING:
-    printf("string('%s')", value->string);
+    if (debug) {
+      wbytes += printf("string('%s')", value->string);
+    } else {
+      wbytes += printf("%s", value->string);
+    }
     break;
   case TYPE_PAIR:
     printf("pair(");
-    object_print(value->pair.head);
+    wbytes += object_print(value->pair.head, debug);
     printf(",");
-    object_print(value->pair.tail);
+    wbytes += object_print(value->pair.tail, debug);
     printf(")");
     break;
   case TYPE_LIST:
-    printf("list[");
+    wbytes += printf("list[");
     struct list *item = value->list;
     while (item != NULL) {
-      object_print(item->item);
+      wbytes += object_print(item->item, debug);
       item = item->next;
       if (item != NULL) {
-        printf(",");
+        wbytes += printf(",");
       }
     }
-    printf("]");
+    wbytes += printf("]");
     break;
   case TYPE_ERROR:
-    printf("error('%s')", value->string);
+    if (debug) {
+      wbytes += printf("error('%s')", value->string);
+    } else {
+      wbytes += printf("error: %s", value->string);
+    }
     break;
   }
+
+  return wbytes;
 }
 
 void enclosing_init(struct enclosing *e, struct vm *vm,
@@ -613,7 +638,11 @@ struct object *vm_run_for(struct enclosing *encl, struct for_expr *for_expr) {
           for_expr->handle_expr->id; // only one iterator handler is supported
       enclosing_bind(&forked, cur_item->item, strdup(item_handle_id));
 
+      struct object *iteration_value =
+          vm_run_expr(&forked, for_expr->iteration_expr);
+
       if (for_expr->filter_expr != NULL) {
+        enclosing_bind(&forked, iteration_value, strdup("it"));
         struct object *filter_value =
             vm_run_expr(&forked, for_expr->filter_expr);
         if (filter_value->type != TYPE_ERROR &&
@@ -624,8 +653,6 @@ struct object *vm_run_for(struct enclosing *encl, struct for_expr *for_expr) {
         }
       }
 
-      struct object *iteration_value =
-          vm_run_expr(&forked, for_expr->iteration_expr);
       struct list *new_item = malloc(sizeof(struct list));
       new_item->next = NULL;
       new_item->item = iteration_value;

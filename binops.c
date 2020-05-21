@@ -556,7 +556,7 @@ struct object *handle_str_u64(struct vm *vm, struct object *left,
   }
 
   char buffer[200];
-  snprintf(buffer, 64L, "%lu", left->u64);
+  snprintf(buffer, 64L, "%lu", right->u64);
   size_t new_size = strlen(buffer) + strlen(left->string);
   char *new_str = malloc(new_size + 1);
   memset(new_str, 0L, new_size + 1);
@@ -577,7 +577,7 @@ struct object *handle_str_i64(struct vm *vm, struct object *left,
   }
 
   char buffer[200];
-  snprintf(buffer, 64L, "%ld", left->i64);
+  snprintf(buffer, 64L, "%ld", right->i64);
   size_t new_size = strlen(buffer) + strlen(left->string);
   char *new_str = malloc(new_size + 1);
   memset(new_str, 0L, new_size + 1);
@@ -598,7 +598,7 @@ struct object *handle_str_f64(struct vm *vm, struct object *left,
   }
 
   char buffer[200];
-  snprintf(buffer, 64L, "%lf", left->f64);
+  snprintf(buffer, 64L, "%lf", right->f64);
   size_t new_size = strlen(buffer) + strlen(left->string);
   char *new_str = malloc(new_size + 1);
 
