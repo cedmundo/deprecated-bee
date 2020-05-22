@@ -126,7 +126,7 @@ struct object *vm_run_expr(struct enclosing *encl, struct expr *expr);
     res->type = TYPE_ERROR;                                                    \
     res->error = malloc(sizeof(char) * 200);                                   \
     memset(res->error, 0L, sizeof(char) * 200);                                \
-    sprintf(res->error, "error: %s", msg);                                     \
+    sprintf(res->error, "%s", msg);                                            \
   } while (0);
 
 #define make_errorf(res, msg, ...)                                             \
@@ -134,5 +134,5 @@ struct object *vm_run_expr(struct enclosing *encl, struct expr *expr);
     res->type = TYPE_ERROR;                                                    \
     res->error = malloc(sizeof(char) * 200);                                   \
     memset(res->error, 0L, sizeof(char) * 200);                                \
-    sprintf(res->error, "error: " msg, __VA_ARGS__);                           \
+    sprintf(res->error, msg, __VA_ARGS__);                                     \
   } while (0);

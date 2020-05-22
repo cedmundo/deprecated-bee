@@ -1,2 +1,7 @@
 
-def main() = tail(pair("hello", pair("world", "!")))
+def gen(x) =
+  lambda y = x + y
+
+def main() =
+  let z = gen(1) in
+    z(1)

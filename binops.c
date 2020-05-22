@@ -637,7 +637,15 @@ struct object *handle_bin_op(struct vm *vm, struct object *left,
                              struct object *right, enum bin_op op) {
   struct object *res;
   int ltype = left->type;
+  if (ltype == TYPE_ERROR) {
+    return left;
+  }
+
   int rtype = right->type;
+  if (rtype == TYPE_ERROR) {
+    return right;
+  }
+
   if (ltype == TYPE_U64 && rtype == TYPE_U64) {
     res = handle_u64_u64(vm, left, right, op);
   } else if (ltype == TYPE_U64 && rtype == TYPE_I64) {
