@@ -13,15 +13,16 @@ programming language, the idea it's to incrementally add new features and make a
   - Equal (`==`), not equal (`!=`), less than (`<`, `<=`) and greater than (`>`, `>=`).
 * If-else conditions.
 * List collections (`[expr, expr, expr, ...]`).
+* Pair builtin type: `pair(a, b), head(x), tail(x)`.
 * Map, Filter and Reduce via list comprehensions (`x for x in [1, 2, 3]` and `reduce c + n for n in [1, 2, 3] with c = 0`).
 * Lambda expressions (`let z = lambda x, y = x + y in z(1)`).
+* Lazy iterators.
+* Bultin functions.
 
 ## Work in progress
 
+* Good GC.
 * Dictionaries.
-* Lazy iterators.
-* Bultin functions.
-* Move/Reference objects instead of copying all the time.
 
 ## Future features
 

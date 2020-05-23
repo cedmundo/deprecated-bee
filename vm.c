@@ -523,22 +523,10 @@ struct object *vm_run_let(struct enclosing *encl, struct let_expr *let_expr) {
   return res;
 }
 
-struct object *vm_run_call(struct enclosing *encl,
-                           struct call_expr *call_expr) {
-  assert(encl != NULL);
-  assert(call_expr != NULL);
-
+struct object *vm_run_function(struct enclosing *encl, struct function function,
+                               struct call_args *expr_args,
+                               struct list *value_args) {
   struct object *res = NULL;
-  // resolve function
-  struct bind *fun_bind = enclosing_find(encl, call_expr->callee);
-  if (fun_bind == NULL) {
-    struct object *res = vm_alloc(encl->vm, false);
-    make_errorf(res, "undefined function '%s'", call_expr->callee);
-    return res;
-  }
-
-  struct object *fun_object = fun_bind->object;
-  struct function function = fun_object->function;
   if (function.target == TARGET_SCRIPT) {
     struct enclosing forked;
     if (function.closure != NULL) {
@@ -547,19 +535,31 @@ struct object *vm_run_call(struct enclosing *encl,
       enclosing_init(&forked, encl->vm, &encl->vm->globals);
     }
     struct def_params *recv_param = function.params;
-    struct call_args *send_param = call_expr->args;
-    while (send_param != NULL) {
+    struct call_args *send_param = expr_args;
+    struct list *send_param_value = value_args;
+    while (send_param != NULL || send_param_value != NULL) {
       if (recv_param == NULL) {
         enclosing_free(&forked);
 
         res = vm_alloc(encl->vm, false);
-        make_errorf(res, "%s expects more arguments", call_expr->callee);
+        make_error(res, "function expects more arguments");
         return res;
       }
 
-      struct object *arg_value = vm_run_expr(encl, send_param->expr);
+      struct object *arg_value;
+      if (send_param != NULL) {
+        arg_value = vm_run_expr(encl, send_param->expr);
+        send_param = send_param->next;
+      } else if (send_param_value != NULL) {
+        arg_value = send_param_value->item;
+        send_param_value = send_param_value->next;
+      } else {
+        res = vm_alloc(encl->vm, false);
+        make_error(res, "expecting a value or expression argument");
+        return res;
+      }
+
       enclosing_bind(&forked, arg_value, strdup(recv_param->id));
-      send_param = send_param->next;
       recv_param = recv_param->next;
     }
 
@@ -568,14 +568,25 @@ struct object *vm_run_call(struct enclosing *encl,
     return res;
   } else {
     native_fun callee = function.native_call;
-    struct call_args *send_param = call_expr->args;
+    struct call_args *send_param = expr_args;
+    struct list *send_param_value = value_args;
     struct list *params_head = NULL;
     struct list *params_tail = NULL;
 
-    while (send_param != NULL) {
+    while (send_param != NULL || send_param_value != NULL) {
       struct list *item = malloc(sizeof(struct list));
       item->next = NULL;
-      item->item = vm_run_expr(encl, send_param->expr);
+      if (send_param != NULL) {
+        item->item = vm_run_expr(encl, send_param->expr);
+        send_param = send_param->next;
+      } else if (send_param_value != NULL) {
+        item->item = send_param_value->item;
+        send_param_value = send_param_value->next;
+      } else {
+        res = vm_alloc(encl->vm, false);
+        make_error(res, "expecting a value or expression argument");
+        return res;
+      }
 
       if (params_head == NULL) {
         params_head = item;
@@ -586,7 +597,6 @@ struct object *vm_run_call(struct enclosing *encl,
       }
 
       params_tail = item;
-      send_param = send_param->next;
     }
 
     struct enclosing forked;
@@ -605,6 +615,24 @@ struct object *vm_run_call(struct enclosing *encl,
     enclosing_free(&forked);
     return res;
   }
+}
+
+struct object *vm_run_call(struct enclosing *encl,
+                           struct call_expr *call_expr) {
+  assert(encl != NULL);
+  assert(call_expr != NULL);
+  //
+  // resolve function
+  struct bind *fun_bind = enclosing_find(encl, call_expr->callee);
+  if (fun_bind == NULL) {
+    struct object *res = vm_alloc(encl->vm, false);
+    make_errorf(res, "undefined function '%s'", call_expr->callee);
+    return res;
+  }
+
+  struct object *fun_object = fun_bind->object;
+  struct function function = fun_object->function;
+  return vm_run_function(encl, function, call_expr->args, NULL);
 }
 
 struct object *vm_run_if(struct enclosing *encl, struct if_expr *if_expr) {
@@ -711,6 +739,61 @@ struct object *vm_run_for(struct enclosing *encl, struct for_expr *for_expr) {
       enclosing_free(&forked);
       cur_item = cur_item->next;
     }
+  } else if (iterator_value->type == TYPE_FUNCTION) {
+    struct object *state = vm_alloc(encl->vm, false);
+    bool keep_iterating = true;
+    char *item_handle_id =
+        for_expr->handle_expr->id; // only one iterator handler is supported
+
+    while (keep_iterating) {
+      struct list iterator_step_args = {
+          .next = NULL,
+          .item = state,
+      };
+      struct object *iterator_next = vm_run_function(
+          encl, iterator_value->function, NULL, &iterator_step_args);
+      if (iterator_next->type != TYPE_PAIR) {
+        keep_iterating = false;
+      } else {
+        state = iterator_next;
+        struct object *head = state->pair.head;
+        assert(head != NULL);
+        keep_iterating = head->bol;
+      }
+
+      struct enclosing forked;
+      enclosing_init(&forked, encl->vm, encl);
+      enclosing_bind(&forked, iterator_next->pair.tail, strdup(item_handle_id));
+
+      struct object *iteration_value =
+          vm_run_expr(&forked, for_expr->iteration_expr);
+
+      if (for_expr->filter_expr != NULL) {
+        enclosing_bind(&forked, iteration_value, strdup("it"));
+        struct object *filter_value =
+            vm_run_expr(&forked, for_expr->filter_expr);
+        if (filter_value->type != TYPE_ERROR &&
+            filter_value->type != TYPE_FUNCTION && filter_value->u64 == 0) {
+          enclosing_free(&forked);
+          continue;
+        }
+      }
+
+      struct list *new_item = malloc(sizeof(struct list));
+      new_item->next = NULL;
+      new_item->item = iteration_value;
+
+      if (res_head == NULL) {
+        res_head = new_item;
+      }
+
+      if (res_tail != NULL) {
+        res_tail->next = new_item;
+      }
+
+      res_tail = new_item;
+      enclosing_free(&forked);
+    }
   } else {
     struct object *res = vm_alloc(encl->vm, false);
     make_errorf(res, "cannot iterate over type %d", iterator_value->type);
@@ -756,6 +839,45 @@ struct object *vm_run_reduce(struct enclosing *encl,
       carry = vm_run_expr(&forked, for_expr->iteration_expr);
       enclosing_free(&forked);
       cur_item = cur_item->next;
+    }
+  } else if (iterator_value->type == TYPE_FUNCTION) {
+    bool keep_iterating = true;
+    char *item_handle_id =
+        for_expr->handle_expr->id; // only one iterator handler is supported
+
+    while (keep_iterating) {
+      struct list iterator_step_args = {
+          .next = NULL,
+          .item = carry,
+      };
+      struct object *iterator_next = vm_run_function(
+          encl, iterator_value->function, NULL, &iterator_step_args);
+      if (iterator_next->type != TYPE_PAIR) {
+        keep_iterating = false;
+      } else {
+        carry = iterator_next;
+        struct object *head = carry->pair.head;
+        assert(head != NULL);
+        keep_iterating = head->bol;
+      }
+
+      struct enclosing forked;
+      enclosing_init(&forked, encl->vm, encl);
+      enclosing_bind(&forked, iterator_next->pair.tail, strdup(item_handle_id));
+
+      struct object *iteration_value =
+          vm_run_expr(&forked, for_expr->iteration_expr);
+
+      if (for_expr->filter_expr != NULL) {
+        enclosing_bind(&forked, iteration_value, strdup("it"));
+        struct object *filter_value =
+            vm_run_expr(&forked, for_expr->filter_expr);
+        if (filter_value->type != TYPE_ERROR &&
+            filter_value->type != TYPE_FUNCTION && filter_value->u64 == 0) {
+          enclosing_free(&forked);
+          continue;
+        }
+      }
     }
   } else {
     struct object *res = vm_alloc(encl->vm, false);

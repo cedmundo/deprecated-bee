@@ -104,6 +104,9 @@ struct bind *enclosing_find(struct enclosing *e, char *id);
 
 void vm_define_all(struct vm *vm, struct def_exprs *defs);
 struct object *vm_run_main(struct vm *vm);
+struct object *vm_run_function(struct enclosing *encl, struct function function,
+                               struct call_args *expr_args,
+                               struct list *value_args);
 struct object *vm_run_def(struct vm *vm, struct def_expr *def);
 
 struct object *vm_run_lit(struct enclosing *encl, struct lit_expr *lit_expr);

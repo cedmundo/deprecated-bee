@@ -1,7 +1,11 @@
 
-def gen(x) =
-  lambda y = x + y
+def range(from, to, step) =
+  lambda prev =
+    if typename(prev) != "pair" then
+      pair(1, from)
+    else
+      let cur = tail(prev) in
+        pair(cur < to - 1, cur + step)
 
 def main() =
-  let z = gen(2) in
-    z(2)
+  x for x in range(0, 10, 1)
