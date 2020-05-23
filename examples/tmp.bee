@@ -3,5 +3,5 @@ def gen(x) =
   lambda y = x + y
 
 def main() =
-  let z = gen(1) in
-    z(1)
+  let z = gen(2) in
+    z(2)

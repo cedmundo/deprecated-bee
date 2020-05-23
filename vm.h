@@ -24,6 +24,7 @@ enum function_target { TARGET_SCRIPT, TARGET_NATIVE };
 struct function {
   native_fun native_call;
   struct def_params *params;
+  struct enclosing *closure;
   struct expr *body;
   char *id;
   enum function_target target;
@@ -98,6 +99,7 @@ void enclosing_init(struct enclosing *e, struct vm *vm,
                     struct enclosing *parent);
 void enclosing_free(struct enclosing *e);
 void enclosing_bind(struct enclosing *e, struct object *object, char *id);
+void enclosing_capture(struct enclosing *into, struct enclosing *from);
 struct bind *enclosing_find(struct enclosing *e, char *id);
 
 void vm_define_all(struct vm *vm, struct def_exprs *defs);

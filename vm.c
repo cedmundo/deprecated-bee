@@ -142,7 +142,13 @@ size_t object_free(struct object *obj) {
     }
     return total;
   }
-  case TYPE_FUNCTION:
+  case TYPE_FUNCTION: {
+    if (obj->function.closure != NULL) {
+      enclosing_free(obj->function.closure);
+      free(obj->function.closure);
+    }
+    break;
+  }
   case TYPE_UNIT:
   case TYPE_NIL:
   case TYPE_BOL:
@@ -270,6 +276,32 @@ void enclosing_init(struct enclosing *e, struct vm *vm,
   e->tail = NULL;
 }
 
+void enclosing_capture(struct enclosing *into, struct enclosing *from) {
+  assert(into != NULL);
+  if (from == NULL) {
+    return;
+  }
+
+  struct bind *src_bind = from->head;
+  while (src_bind != NULL) {
+    struct bind *cpy_bind = malloc(sizeof(struct bind));
+    cpy_bind->id = strdup(src_bind->id);
+    cpy_bind->object = src_bind->object;
+    cpy_bind->next = NULL;
+
+    if (into->head == NULL) {
+      into->head = cpy_bind;
+    }
+
+    if (into->tail != NULL) {
+      into->tail->next = cpy_bind;
+    }
+
+    into->tail = cpy_bind;
+    src_bind = src_bind->next;
+  }
+}
+
 void enclosing_free(struct enclosing *e) {
   assert(e != NULL);
   struct bind *cur = e->head;
@@ -369,6 +401,7 @@ struct object *vm_run_def(struct vm *vm, struct def_expr *def) {
   object->function = (struct function){
       .target = TARGET_SCRIPT,
       .native_call = NULL,
+      .closure = NULL,
       .params = def->params,
       .body = def->body,
       .id = def->id,
@@ -504,11 +537,15 @@ struct object *vm_run_call(struct enclosing *encl,
     return res;
   }
 
-  struct enclosing forked;
-  enclosing_init(&forked, encl->vm, encl);
   struct object *fun_object = fun_bind->object;
   struct function function = fun_object->function;
   if (function.target == TARGET_SCRIPT) {
+    struct enclosing forked;
+    if (function.closure != NULL) {
+      enclosing_init(&forked, encl->vm, function.closure);
+    } else {
+      enclosing_init(&forked, encl->vm, &encl->vm->globals);
+    }
     struct def_params *recv_param = function.params;
     struct call_args *send_param = call_expr->args;
     while (send_param != NULL) {
@@ -553,7 +590,12 @@ struct object *vm_run_call(struct enclosing *encl,
     }
 
     struct enclosing forked;
-    enclosing_init(&forked, encl->vm, &encl->vm->globals);
+    if (function.closure != NULL) {
+      enclosing_init(&forked, encl->vm, function.closure);
+    } else {
+      enclosing_init(&forked, encl->vm, &encl->vm->globals);
+    }
+
     struct object *args = vm_alloc(encl->vm, false);
     args->type = TYPE_LIST;
     args->list = params_head;
@@ -729,11 +771,16 @@ struct object *vm_run_lambda(struct enclosing *encl,
   assert(encl != NULL);
   assert(lambda_expr != NULL);
 
+  struct enclosing *closure = malloc(sizeof(struct enclosing));
+  enclosing_init(closure, encl->vm, &encl->vm->globals);
+  enclosing_capture(closure, encl);
+
   struct object *object = vm_alloc(encl->vm, false);
   object->type = TYPE_FUNCTION;
   object->function = (struct function){
       .target = TARGET_SCRIPT,
       .native_call = NULL,
+      .closure = closure,
       .params = lambda_expr->params,
       .body = lambda_expr->body,
       .id = NULL,
