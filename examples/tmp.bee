@@ -1,3 +1,11 @@
 
+def range(from, to, step) =
+  lambda prev =
+    if typename(prev) != "pair" then
+      pair(1, from)
+    else
+      let cur = tail(prev) in
+        pair(cur < to - 1, cur + step)
+
 def main() =
-  let x = lambda who = "hello " + who in x("world")
+  x for x in range(0, 10, 1)
