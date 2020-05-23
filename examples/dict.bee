@@ -1,0 +1,9 @@
+
+def main() = {
+  "a": 0,
+  "aa": 1,
+  "aaa": 2,
+  "aaaa": 3,
+  "aaaaa": 4,
+  "aaaaaa": 5
+}

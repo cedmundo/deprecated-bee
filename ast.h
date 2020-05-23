@@ -34,6 +34,7 @@ enum expr_type {
   EXPR_FOR,
   EXPR_REDUCE,
   EXPR_LIST,
+  EXPR_DICT,
   EXPR_LAMBDA,
 };
 struct expr {
@@ -49,6 +50,7 @@ struct expr {
     struct for_expr *for_expr;
     struct reduce_expr *reduce_expr;
     struct list_expr *list_expr;
+    struct dict_expr *dict_expr;
     struct lambda_expr *lambda_expr;
   };
   enum expr_type type;
@@ -167,6 +169,12 @@ struct list_expr {
   struct expr *item;
 };
 
+struct dict_expr {
+  struct dict_expr *next;
+  char *key;
+  struct expr *value;
+};
+
 struct lambda_expr {
   struct def_params *params;
   struct expr *body;
@@ -187,6 +195,7 @@ struct expr *make_expr_from_if(struct if_expr *expr);
 struct expr *make_expr_from_for(struct for_expr *expr);
 struct expr *make_expr_from_reduce(struct reduce_expr *expr);
 struct expr *make_expr_from_list(struct list_expr *expr);
+struct expr *make_expr_from_dict(struct dict_expr *expr);
 struct expr *make_expr_from_lambda(struct lambda_expr *expr);
 
 struct lit_expr *make_lit_expr(enum lit_type type, char *v);
@@ -241,6 +250,10 @@ struct reduce_expr *make_reduce_expr(struct for_expr *for_expr, char *id,
 struct list_expr *make_list_expr(struct expr *item);
 struct list_expr *append_list_expr(struct list_expr *left, struct expr *expr);
 
+struct dict_expr *make_dict_expr(char *key, struct expr *value);
+struct dict_expr *append_dict_expr(struct dict_expr *left,
+                                   struct dict_expr *right);
+
 struct lambda_expr *make_lambda_expr(struct def_params *params,
                                      struct expr *body);
 
@@ -262,6 +275,7 @@ void free_for_handles(struct for_handles *for_handles);
 void free_for_expr(struct for_expr *for_expr);
 void free_reduce_expr(struct reduce_expr *reduce_expr);
 void free_list_expr(struct list_expr *list_expr);
+void free_dict_expr(struct dict_expr *dict_expr);
 void free_lambda_expr(struct lambda_expr *lambda_expr);
 
 #define walk_to_last(i, c, block)                                              \

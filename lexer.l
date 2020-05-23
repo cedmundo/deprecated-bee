@@ -50,6 +50,7 @@ extern char* strval;
 "%"         { return T_MOD; }
 ","         { return T_COMMA; }
 "."         { return T_DOT; }
+":"         { return T_COLON; }
 "def"       { return T_DEF; }
 "let"       { return T_LET; }
 "for"       { return T_FOR; }

@@ -1,5 +1,6 @@
 #pragma once
 #include "ast.h"
+#include "hashmap.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -42,6 +43,7 @@ enum object_type {
   TYPE_STRING,
   TYPE_PAIR,
   TYPE_LIST,
+  TYPE_DICT,
   TYPE_FUNCTION,
 };
 
@@ -57,6 +59,7 @@ struct object {
     struct list *list;
     struct pair pair;
     struct function function;
+    struct hashmap hashmap;
   };
   enum object_type type;
   enum gc_flag flag;
@@ -118,6 +121,7 @@ struct object *vm_run_let(struct enclosing *encl, struct let_expr *let_expr);
 struct object *vm_run_call(struct enclosing *encl, struct call_expr *call_expr);
 struct object *vm_run_if(struct enclosing *encl, struct if_expr *if_expr);
 struct object *vm_run_list(struct enclosing *encl, struct list_expr *list_expr);
+struct object *vm_run_dict(struct enclosing *encl, struct dict_expr *dict_expr);
 struct object *vm_run_for(struct enclosing *encl, struct for_expr *for_expr);
 struct object *vm_run_reduce(struct enclosing *encl,
                              struct reduce_expr *reduce_expr);

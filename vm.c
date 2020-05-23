@@ -3,6 +3,7 @@
 #include "ast.h"
 #include "binops.h"
 #include "builtins.h"
+#include "hashmap.h"
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -131,6 +132,10 @@ size_t object_free(struct object *obj) {
     free(obj->pair.tail);
     return hf + tf;
   }
+  case TYPE_DICT: {
+    // hashmap_free(&obj->hashmap);
+    break;
+  }
   case TYPE_LIST: {
     struct list *cur = obj->list;
     struct list *tmp = NULL;
@@ -186,7 +191,40 @@ size_t object_mark(struct object *obj) {
     }
   }
 
+  if (obj->type == TYPE_DICT) {
+    struct hashmap hm = obj->hashmap;
+    struct kv_entry **rows = hm.rows;
+    for (size_t ri = 0LL; ri < hm.total_rows; ri++) {
+      struct kv_entry *col = rows[ri];
+      while (col != NULL) {
+        object_mark(col->value);
+        col = col->next;
+      }
+    }
+  }
+
   return 1;
+}
+
+size_t dict_print_kvs(struct object *obj, bool debug) {
+  assert(obj != NULL);
+  assert(obj->type == TYPE_DICT);
+
+  size_t wbytes = 0LL;
+  struct hashmap hm = obj->hashmap;
+  struct kv_entry **rows = hm.rows;
+  for (size_t ri = 0LL; ri < hm.total_rows; ri++) {
+    struct kv_entry *col = rows[ri];
+    while (col != NULL) {
+      wbytes += printf("%s: ", col->key);
+      wbytes += object_print(col->value, debug);
+      printf(", ");
+
+      col = col->next;
+    }
+  }
+
+  return wbytes;
 }
 
 size_t object_print(struct object *value, bool debug) {
@@ -255,11 +293,16 @@ size_t object_print(struct object *value, bool debug) {
     }
     wbytes += printf("]");
     break;
+  case TYPE_DICT:
+    wbytes += printf("dict{");
+    wbytes += dict_print_kvs(value, debug);
+    wbytes += printf("}");
+    break;
   case TYPE_ERROR:
     if (debug) {
       wbytes += printf("error('%s')", value->string);
     } else {
-      wbytes += printf("error: %s", value->string);
+      wbytes += printf("%s", value->string);
     }
     break;
   }
@@ -691,6 +734,23 @@ struct object *vm_run_list(struct enclosing *encl,
   return res;
 }
 
+struct object *vm_run_dict(struct enclosing *encl,
+                           struct dict_expr *dict_expr) {
+  assert(encl != NULL);
+  struct object *res = vm_alloc(encl->vm, false);
+  res->type = TYPE_DICT;
+  hashmap_init(&res->hashmap, DEFAULT_HM_TOTAL_ROWS, DEFAULT_HM_MAX_OBJECTS);
+
+  struct dict_expr *cur = dict_expr;
+  while (cur != NULL) {
+    struct object *value = vm_run_expr(encl, cur->value);
+    enum hashmap_state state = hashmap_put(&res->hashmap, cur->key, value);
+    assert(state == HM_OK);
+    cur = cur->next;
+  }
+  return res;
+}
+
 struct object *vm_run_for(struct enclosing *encl, struct for_expr *for_expr) {
   assert(encl != NULL);
   assert(for_expr != NULL);
@@ -940,6 +1000,9 @@ struct object *vm_run_expr(struct enclosing *encl, struct expr *expr) {
     break;
   case EXPR_LIST:
     res = vm_run_list(encl, expr->list_expr);
+    break;
+  case EXPR_DICT:
+    res = vm_run_dict(encl, expr->dict_expr);
     break;
   case EXPR_FOR:
     res = vm_run_for(encl, expr->for_expr);

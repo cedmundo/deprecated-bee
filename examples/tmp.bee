@@ -8,4 +8,4 @@ def range(from, to, step) =
         pair(cur < to - 1, cur + step)
 
 def main() =
-  x for x in range(0, 10, 1)
+  print(x) for x in range(0, 10, 1)

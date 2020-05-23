@@ -110,6 +110,13 @@ struct expr *make_expr_from_list(struct list_expr *expr) {
   return new_expr;
 }
 
+struct expr *make_expr_from_dict(struct dict_expr *expr) {
+  struct expr *new_expr = malloc(sizeof(struct expr));
+  new_expr->type = EXPR_DICT;
+  new_expr->dict_expr = expr;
+  return new_expr;
+}
+
 struct expr *make_expr_from_lambda(struct lambda_expr *expr) {
   struct expr *new_expr = malloc(sizeof(struct expr));
   new_expr->type = EXPR_LAMBDA;
@@ -367,6 +374,27 @@ struct list_expr *append_list_expr(struct list_expr *left, struct expr *expr) {
   return left;
 }
 
+struct dict_expr *make_dict_expr(char *key, struct expr *value) {
+  assert(key != NULL);
+  assert(value != NULL);
+  struct dict_expr *dict_expr = malloc(sizeof(struct dict_expr));
+  dict_expr->next = NULL;
+  dict_expr->value = value;
+  dict_expr->key = key;
+  return dict_expr;
+}
+
+struct dict_expr *append_dict_expr(struct dict_expr *left,
+                                   struct dict_expr *right) {
+  assert(left != NULL);
+  assert(right != NULL);
+  walk_to_last(struct dict_expr, left, {
+    assert(last != NULL);
+    last->next = right;
+  });
+  return left;
+}
+
 struct lambda_expr *make_lambda_expr(struct def_params *params,
                                      struct expr *body) {
   assert(body != NULL);
@@ -437,6 +465,12 @@ void free_expr(struct expr *expr) {
       free_list_expr(expr->list_expr);
     }
     free(expr->list_expr);
+    break;
+  case EXPR_DICT:
+    if (expr->dict_expr != NULL) {
+      free_dict_expr(expr->dict_expr);
+    }
+    free(expr->dict_expr);
     break;
   case EXPR_LAMBDA:
     if (expr->lambda_expr != NULL) {
@@ -665,6 +699,23 @@ void free_list_expr(struct list_expr *list_expr) {
   if (list_expr->next != NULL) {
     free_list_expr(list_expr->next);
     free(list_expr->next);
+  }
+}
+
+void free_dict_expr(struct dict_expr *dict_expr) {
+  assert(dict_expr != NULL);
+  if (dict_expr->value != NULL) {
+    free_expr(dict_expr->value);
+    free(dict_expr->value);
+  }
+
+  if (dict_expr->key != NULL) {
+    free(dict_expr->key);
+  }
+
+  if (dict_expr->next != NULL) {
+    free_dict_expr(dict_expr->next);
+    free(dict_expr->next);
   }
 }
 

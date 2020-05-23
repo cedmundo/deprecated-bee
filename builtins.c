@@ -111,6 +111,9 @@ struct object *bee_typename(struct enclosing *encl) {
   case TYPE_LIST:
     res->string = strdup("list");
     break;
+  case TYPE_DICT:
+    res->string = strdup("dict");
+    break;
   case TYPE_ERROR:
     res->string = strdup("error");
     break;

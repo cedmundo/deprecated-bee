@@ -43,6 +43,7 @@ int yyerror(struct vm *vm, char *s);
   struct for_expr *for_expr;
   struct reduce_expr *reduce_expr;
   struct list_expr *list_expr;
+  struct dict_expr *dict_expr;
   struct lambda_expr *lambda_expr;
 }
 
@@ -65,6 +66,7 @@ int yyerror(struct vm *vm, char *s);
 %type<for_expr> for_expr
 %type<reduce_expr> reduce_expr
 %type<list_expr> list_expr list_items
+%type<dict_expr> dict_expr dict_items dict_item
 %type<lambda_expr> lambda_expr
 
 %parse-param {struct vm *vm}
@@ -108,6 +110,7 @@ expr: T_LPAR expr T_RPAR  { $$ = $2; }
     | def_expr            { $$ = make_expr_from_def($1); }
     | if_expr             { $$ = make_expr_from_if($1); }
     | list_expr           { $$ = make_expr_from_list($1); }
+    | dict_expr           { $$ = make_expr_from_dict($1); }
     | for_expr            { $$ = make_expr_from_for($1); }
     | reduce_expr         { $$ = make_expr_from_reduce($1); }
     | lambda_expr         { $$ = make_expr_from_lambda($1); }
@@ -196,6 +199,28 @@ list_items: %empty                    { $$ = NULL; }
           ;
 
 list_expr: T_LSB list_items T_RSB     { $$ = $2; }
+
+dict_item: id T_COLON expr            { $$ = make_dict_expr($1, $3); }
+         | lit_expr T_COLON expr
+         {
+            if ($1->type != LIT_STRING) {
+              yyerror(vm, "only string keys are supported");
+              YYERROR;
+            }
+
+            size_t quoted_size = strlen($1->raw_value);
+            char *value = strndup($1->raw_value + 1, quoted_size - 2);
+            $$ = make_dict_expr(value, $3);
+         }
+         ;
+
+dict_items: %empty                        { $$ = NULL; }
+          | dict_item                     { $$ = $1; }
+          | dict_items T_COMMA dict_item  { $$ = append_dict_expr($1, $3); }
+          ;
+
+dict_expr: T_LCB dict_items T_RCB         { $$ = $2; }
+         ;
 
 lambda_expr: T_LAMBDA def_params T_ASSIGN expr { $$ = make_lambda_expr($2, $4); }
 
