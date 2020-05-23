@@ -18,11 +18,11 @@ programming language, the idea it's to incrementally add new features and make a
 * Lambda expressions (`let z = lambda x, y = x + y in z(1)`).
 * Lazy iterators.
 * Bultin functions.
+* Dictionaries (`{key: "value", "string with spaces": 12.2}`).
 
 ## Work in progress
 
-* Good GC.
-* Dictionaries.
+* Good GC (fixing it because it's broken right now).
 
 ## Future features
 
@@ -32,7 +32,6 @@ programming language, the idea it's to incrementally add new features and make a
 * Modules and standard library.
 * JIT and FFI.
 * Concurrency and tasks.
-* Closures instead of current scoping model.
 * Abstract Data Types.
 
 As you might think, this project is still on heavy development and it's far from being stable, there are leaks on the overall memory
