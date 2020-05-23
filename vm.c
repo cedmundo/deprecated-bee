@@ -492,6 +492,117 @@ struct object *vm_run_lookup(struct enclosing *encl,
   } else {
     assert(lookup_expr->object != NULL);
     assert(lookup_expr->key != NULL);
+
+    struct object *res = NULL;
+    struct object *key = vm_run_expr(encl, lookup_expr->key);
+    struct object *base = vm_run_expr(encl, lookup_expr->object);
+    switch (base->type) {
+    case TYPE_PAIR:
+      if (key->type != TYPE_I64 && key->type != TYPE_U64) {
+        res = vm_alloc(encl->vm, false);
+        make_errorf(res, "invalid index type: %d", key->type);
+        return res;
+      }
+
+      if (key->u64 > 1) {
+        res = vm_alloc(encl->vm, false);
+        make_error(res, "index out of range");
+        return res;
+      }
+
+      if (key->u64 == 0) {
+        return base->pair.head;
+      } else {
+        return base->pair.tail;
+      }
+      break;
+    case TYPE_LIST:
+      if (key->type != TYPE_I64 && key->type != TYPE_U64) {
+        res = vm_alloc(encl->vm, false);
+        make_errorf(res, "invalid index type: %d", key->type);
+        return res;
+      }
+
+      if (key->type == TYPE_I64 && key->u64 < 0) {
+        res = vm_alloc(encl->vm, false);
+        make_error(res, "index out of range");
+        return res;
+      }
+
+      size_t index = 0LL;
+      struct list *cur = base->list;
+      while (cur != NULL) {
+        if (index == key->u64) {
+          res = cur->item;
+          break;
+        }
+
+        index++;
+        cur = cur->next;
+      }
+
+      if (res == NULL) {
+        res = vm_alloc(encl->vm, false);
+        make_error(res, "index out of range");
+        return res;
+      } else {
+        return res;
+      }
+      break;
+    case TYPE_DICT:
+      if (key->type != TYPE_STRING) {
+        res = vm_alloc(encl->vm, false);
+        make_errorf(res, "invalid index type: %d", key->type);
+        return res;
+      }
+
+      enum hashmap_state state = hashmap_get(&base->hashmap, key->string, &res);
+      if (state == HM_KEY_NOT_FOUND) {
+        make_error(res, "key not found");
+        return res;
+      }
+
+      if (state != HM_OK) {
+        make_error(res, "invalid or corrupt hashmap");
+        return res;
+      }
+
+      return res;
+    case TYPE_STRING:
+      if (key->type != TYPE_I64 && key->type != TYPE_U64) {
+        res = vm_alloc(encl->vm, false);
+        make_errorf(res, "invalid index type: %d", key->type);
+        return res;
+      }
+
+      if (key->type == TYPE_I64 && key->u64 < 0) {
+        res = vm_alloc(encl->vm, false);
+        make_error(res, "index out of range");
+        return res;
+      }
+
+      if (key->u64 > strlen(base->string)) {
+        res = vm_alloc(encl->vm, false);
+        make_error(res, "index out of range");
+        return res;
+      }
+
+      res = vm_alloc(encl->vm, false);
+      res->type = TYPE_U64;
+      res->u64 = base->string[key->u64];
+      return res;
+    case TYPE_UNIT:
+    case TYPE_NIL:
+    case TYPE_BOL:
+    case TYPE_U64:
+    case TYPE_I64:
+    case TYPE_F64:
+    case TYPE_ERROR:
+    case TYPE_FUNCTION:
+      res = vm_alloc(encl->vm, false);
+      make_errorf(res, "cannot index object of type: %d", base->type);
+      return res;
+    }
   }
 
   return NULL;
@@ -664,8 +775,7 @@ struct object *vm_run_call(struct enclosing *encl,
                            struct call_expr *call_expr) {
   assert(encl != NULL);
   assert(call_expr != NULL);
-  //
-  // resolve function
+
   struct bind *fun_bind = enclosing_find(encl, call_expr->callee);
   if (fun_bind == NULL) {
     struct object *res = vm_alloc(encl->vm, false);

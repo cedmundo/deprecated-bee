@@ -123,7 +123,6 @@ enum hashmap_state hashmap_get(struct hashmap *hm, char *key,
   assert(hm != NULL);
   assert(key != NULL);
   assert(value_out != NULL);
-  assert(*value_out == NULL);
 
   uint64_t index = hashmap_reduce(hashmap_hash(key), hm->total_rows);
   struct kv_entry *list = hm->rows[index];
