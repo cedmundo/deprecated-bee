@@ -83,33 +83,33 @@ struct node *parse_primary(char *input, char **rest) {
   return node;
 }
 
-jit_value_t compile_bin_add(jit_function_t f, struct node *node);
-jit_value_t compile_bin_sub(jit_function_t f, struct node *node);
-jit_value_t compile_expr(jit_function_t f, struct node *node);
+jit_value_t build_bin_add(jit_function_t f, struct node *node);
+jit_value_t build_bin_sub(jit_function_t f, struct node *node);
+jit_value_t build_expr(jit_function_t f, struct node *node);
 
-jit_value_t compile_expr(jit_function_t f, struct node *node) {
+jit_value_t build_expr(jit_function_t f, struct node *node) {
   switch (node->type) {
   case NT_I64:
     return jit_value_create_nint_constant(f, jit_type_int, node->val_i64);
   case NT_ADD:
-    return compile_bin_add(f, node);
+    return build_bin_add(f, node);
   case NT_SUB:
-    return compile_bin_sub(f, node);
+    return build_bin_sub(f, node);
   }
 
-  error("could not compile expression\n");
+  error("could not build expression\n");
   return NULL;
 }
 
-jit_value_t compile_bin_add(jit_function_t f, struct node *node) {
-  jit_value_t left = compile_expr(f, node->left);
-  jit_value_t right = compile_expr(f, node->right);
+jit_value_t build_bin_add(jit_function_t f, struct node *node) {
+  jit_value_t left = build_expr(f, node->left);
+  jit_value_t right = build_expr(f, node->right);
   return jit_insn_add(f, left, right);
 }
 
-jit_value_t compile_bin_sub(jit_function_t f, struct node *node) {
-  jit_value_t left = compile_expr(f, node->left);
-  jit_value_t right = compile_expr(f, node->right);
+jit_value_t build_bin_sub(jit_function_t f, struct node *node) {
+  jit_value_t left = build_expr(f, node->left);
+  jit_value_t right = build_expr(f, node->right);
   return jit_insn_sub(f, left, right);
 }
 
@@ -131,7 +131,7 @@ int main(int argc, char **argv) {
   jit_type_t main_signature =
       jit_type_create_signature(jit_abi_cdecl, jit_type_int, NULL, 0, 1);
   jit_function_t main = jit_function_create(context, main_signature);
-  jit_insn_return(main, compile_expr(main, node));
+  jit_insn_return(main, build_expr(main, node));
 
   jit_function_compile(main);
 
