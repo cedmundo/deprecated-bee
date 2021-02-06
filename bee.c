@@ -15,6 +15,7 @@ enum node_type {
   NT_MUL,
   NT_DIV,
   NT_REM,
+  NT_NEG,
   NT_I64,
 };
 
@@ -56,7 +57,15 @@ struct node *new_lr_node(enum node_type type, struct node *left,
   return node;
 }
 
+struct node *new_l_node(enum node_type type, struct node *left) {
+  struct node *node = new_node();
+  node->type = type;
+  node->left = left;
+  return node;
+}
+
 struct node *parse_primary(char *input, char **rest);
+struct node *parse_unary(char *input, char **rest);
 struct node *parse_term(char *input, char **rest);
 struct node *parse_sum(char *input, char **rest);
 
@@ -79,7 +88,7 @@ struct node *parse_sum(char *input, char **rest) {
   }
 }
 
-// term = primary ("*" primary | "/" primary | "%" primary)*
+// term = unary ("*" unary | "/" unary | "%" unary)*
 struct node *parse_term(char *input, char **rest) {
   struct node *node = parse_primary(input, rest);
 
@@ -103,8 +112,31 @@ struct node *parse_term(char *input, char **rest) {
   }
 }
 
-// primary = i64
+// unary = ( "+" | "-" ) unary
+//       | primary
+struct node *parse_unary(char *input, char **rest) {
+  if (match("+", input, rest)) {
+    return parse_unary(*rest, rest);
+  }
+
+  if (match("-", input, rest)) {
+    return new_l_node(NT_NEG, parse_unary(*rest, rest));
+  }
+
+  return parse_primary(input, rest);
+}
+
+// primary = "(" add ")" | i64
 struct node *parse_primary(char *input, char **rest) {
+  if (match("(", input, rest)) {
+    struct node *node = parse_sum(*rest, rest);
+    if (!match(")", *rest, rest)) {
+      error("expecting ')'");
+    }
+
+    return node;
+  }
+
   struct node *node = new_node();
   node->type = NT_I64;
   node->val_i64 = strtol(input, rest, 10);
@@ -122,6 +154,8 @@ jit_value_t build_expr(jit_function_t f, struct node *node) {
   switch (node->type) {
   case NT_I64:
     return jit_value_create_nint_constant(f, jit_type_int, node->val_i64);
+  case NT_NEG:
+    return jit_insn_neg(f, build_expr(f, node->left));
   case NT_ADD:
     return build_bin_add(f, node);
   case NT_SUB:

@@ -35,5 +35,14 @@ assert "4-6/2" "1"
 assert "4%2" "0"
 assert "3%2" "1"
 
+assert "-2" "-2"
+assert "+2" "2"
+assert "--2" "2"
+assert "-+2" "-2"
+assert "+-2" "-2"
+assert "+++2" "2"
+assert "(1+1)*3" "6"
+assert "(-2)+3" "1"
+
 { set +x; } 2>/dev/null;
 echo "ALL PASSED"
