@@ -80,8 +80,8 @@ assert "1<1" "0"
 assert "2+1>2-1" "1"
 assert "2+1<2-1" "0"
 
-assert "!0" "1"
-assert "!1" "0"
+assert "!1" "-2" # Not applied to 64-bit integer
+assert "!0" "-1" # Not applied to 64-bit integer
 
 { set +x; } 2>/dev/null;
 echo "ALL PASSED"

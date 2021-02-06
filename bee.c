@@ -217,12 +217,12 @@ struct node *parse_factor(char *input, char **rest) {
     return parse_factor(*rest, rest);
   }
 
-  if (match("-", input, rest)) {
-    return new_l_node(NT_NEG, parse_factor(*rest, rest));
-  }
-
   if (match("!", input, rest)) {
     return new_l_node(NT_NOT, parse_factor(*rest, rest));
+  }
+
+  if (match("-", input, rest)) {
+    return new_l_node(NT_NEG, parse_factor(*rest, rest));
   }
 
   return parse_primary(input, rest);
