@@ -217,7 +217,7 @@ struct node *parse_factor(char *input, char **rest) {
     return parse_factor(*rest, rest);
   }
 
-  if (match("!", input, rest)) {
+  if (match("¬", input, rest)) {
     return new_l_node(NT_NOT, parse_factor(*rest, rest));
   }
 
