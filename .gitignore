@@ -4,3 +4,4 @@ bin
 lex.yy.c
 y.tab.*
 build
+*.swp
