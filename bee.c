@@ -21,6 +21,12 @@ enum node_type {
   NT_SAND,
   NT_OR,
   NT_SOR,
+  NT_EQ,
+  NT_NE,
+  NT_LT,
+  NT_LE,
+  NT_GT,
+  NT_GE,
   NT_I64,
 };
 
@@ -75,10 +81,51 @@ struct node *parse_term(char *input, char **rest);
 struct node *parse_sum(char *input, char **rest);
 struct node *parse_conj(char *input, char **rest);
 struct node *parse_disj(char *input, char **rest);
+struct node *parse_rel(char *input, char **rest);
 struct node *parse_expr(char *input, char **rest);
 
 struct node *parse_expr(char *input, char **rest) {
-  return parse_disj(input, rest);
+  return parse_rel(input, rest);
+}
+
+// rel = disj ("==" disj | "!=" disj | ">=" disj | ">" disj | "<=" disj | "<"
+// disj)*
+struct node *parse_rel(char *input, char **rest) {
+  struct node *node = parse_disj(input, rest);
+
+  for (;;) {
+    if (match("==", *rest, rest)) {
+      node = new_lr_node(NT_EQ, node, parse_disj(*rest, rest));
+      continue;
+    }
+
+    if (match("!=", *rest, rest)) {
+      node = new_lr_node(NT_NE, node, parse_disj(*rest, rest));
+      continue;
+    }
+
+    if (match(">=", *rest, rest)) {
+      node = new_lr_node(NT_GE, node, parse_disj(*rest, rest));
+      continue;
+    }
+
+    if (match("<=", *rest, rest)) {
+      node = new_lr_node(NT_LE, node, parse_disj(*rest, rest));
+      continue;
+    }
+
+    if (match(">", *rest, rest)) {
+      node = new_lr_node(NT_GT, node, parse_disj(*rest, rest));
+      continue;
+    }
+
+    if (match("<", *rest, rest)) {
+      node = new_lr_node(NT_LT, node, parse_disj(*rest, rest));
+      continue;
+    }
+
+    return node;
+  }
 }
 
 // disj = conj ("|" conj | "||" conj)*
@@ -202,6 +249,12 @@ jit_value_t build_bin_and(jit_function_t f, struct node *node);
 jit_value_t build_bin_sand(jit_function_t f, struct node *node);
 jit_value_t build_bin_or(jit_function_t f, struct node *node);
 jit_value_t build_bin_sor(jit_function_t f, struct node *node);
+jit_value_t build_bin_eq(jit_function_t f, struct node *node);
+jit_value_t build_bin_ne(jit_function_t f, struct node *node);
+jit_value_t build_bin_le(jit_function_t f, struct node *node);
+jit_value_t build_bin_lt(jit_function_t f, struct node *node);
+jit_value_t build_bin_ge(jit_function_t f, struct node *node);
+jit_value_t build_bin_gt(jit_function_t f, struct node *node);
 jit_value_t build_expr(jit_function_t f, struct node *node);
 
 jit_value_t build_expr(jit_function_t f, struct node *node) {
@@ -228,6 +281,18 @@ jit_value_t build_expr(jit_function_t f, struct node *node) {
     return build_bin_or(f, node);
   case NT_SOR:
     return build_bin_sor(f, node);
+  case NT_EQ:
+    return build_bin_eq(f, node);
+  case NT_NE:
+    return build_bin_ne(f, node);
+  case NT_LT:
+    return build_bin_lt(f, node);
+  case NT_LE:
+    return build_bin_le(f, node);
+  case NT_GT:
+    return build_bin_gt(f, node);
+  case NT_GE:
+    return build_bin_ge(f, node);
   }
 
   error("could not build expression\n");
@@ -294,6 +359,42 @@ jit_value_t build_bin_sor(jit_function_t f, struct node *node) {
   right = build_expr(f, node->right);
   jit_insn_label(f, &skip_right);
   return jit_insn_or(f, left, right);
+}
+
+jit_value_t build_bin_eq(jit_function_t f, struct node *node) {
+  jit_value_t left = build_expr(f, node->left);
+  jit_value_t right = build_expr(f, node->right);
+  return jit_insn_eq(f, left, right);
+}
+
+jit_value_t build_bin_ne(jit_function_t f, struct node *node) {
+  jit_value_t left = build_expr(f, node->left);
+  jit_value_t right = build_expr(f, node->right);
+  return jit_insn_ne(f, left, right);
+}
+
+jit_value_t build_bin_le(jit_function_t f, struct node *node) {
+  jit_value_t left = build_expr(f, node->left);
+  jit_value_t right = build_expr(f, node->right);
+  return jit_insn_le(f, left, right);
+}
+
+jit_value_t build_bin_lt(jit_function_t f, struct node *node) {
+  jit_value_t left = build_expr(f, node->left);
+  jit_value_t right = build_expr(f, node->right);
+  return jit_insn_lt(f, left, right);
+}
+
+jit_value_t build_bin_ge(jit_function_t f, struct node *node) {
+  jit_value_t left = build_expr(f, node->left);
+  jit_value_t right = build_expr(f, node->right);
+  return jit_insn_ge(f, left, right);
+}
+
+jit_value_t build_bin_gt(jit_function_t f, struct node *node) {
+  jit_value_t left = build_expr(f, node->left);
+  jit_value_t right = build_expr(f, node->right);
+  return jit_insn_gt(f, left, right);
 }
 
 int main(int argc, char **argv) {
