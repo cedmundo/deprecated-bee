@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <jit/jit-common.h>
 #include <jit/jit-context.h>
 #include <jit/jit-insn.h>
 #include <jit/jit-value.h>
@@ -16,6 +17,10 @@ enum node_type {
   NT_DIV,
   NT_REM,
   NT_NEG,
+  NT_AND,
+  NT_SAND,
+  NT_OR,
+  NT_SOR,
   NT_I64,
 };
 
@@ -65,11 +70,56 @@ struct node *new_l_node(enum node_type type, struct node *left) {
 }
 
 struct node *parse_primary(char *input, char **rest);
-struct node *parse_unary(char *input, char **rest);
+struct node *parse_factor(char *input, char **rest);
 struct node *parse_term(char *input, char **rest);
 struct node *parse_sum(char *input, char **rest);
+struct node *parse_conj(char *input, char **rest);
+struct node *parse_disj(char *input, char **rest);
+struct node *parse_expr(char *input, char **rest);
 
-// sum = primary ("+" primary | "-" primary)*
+struct node *parse_expr(char *input, char **rest) {
+  return parse_disj(input, rest);
+}
+
+// disj = conj ("|" conj | "||" conj)*
+struct node *parse_disj(char *input, char **rest) {
+  struct node *node = parse_conj(input, rest);
+
+  for (;;) {
+    if (match("||", *rest, rest)) {
+      node = new_lr_node(NT_SOR, node, parse_conj(*rest, rest));
+      continue;
+    }
+
+    if (match("|", *rest, rest)) {
+      node = new_lr_node(NT_OR, node, parse_conj(*rest, rest));
+      continue;
+    }
+
+    return node;
+  }
+}
+
+// conj = sum ("&" sum | "&&" sum)*
+struct node *parse_conj(char *input, char **rest) {
+  struct node *node = parse_sum(input, rest);
+
+  for (;;) {
+    if (match("&&", *rest, rest)) {
+      node = new_lr_node(NT_SAND, node, parse_sum(*rest, rest));
+      continue;
+    }
+
+    if (match("&", *rest, rest)) {
+      node = new_lr_node(NT_AND, node, parse_sum(*rest, rest));
+      continue;
+    }
+
+    return node;
+  }
+}
+
+// sum = term ("+" term | "-" term)*
 struct node *parse_sum(char *input, char **rest) {
   struct node *node = parse_term(input, rest);
 
@@ -88,23 +138,23 @@ struct node *parse_sum(char *input, char **rest) {
   }
 }
 
-// term = unary ("*" unary | "/" unary | "%" unary)*
+// term = factor ("*" factor | "/" factor | "%" factor)*
 struct node *parse_term(char *input, char **rest) {
-  struct node *node = parse_primary(input, rest);
+  struct node *node = parse_factor(input, rest);
 
   for (;;) {
     if (match("*", *rest, rest)) {
-      node = new_lr_node(NT_MUL, node, parse_primary(*rest, rest));
+      node = new_lr_node(NT_MUL, node, parse_factor(*rest, rest));
       continue;
     }
 
     if (match("/", *rest, rest)) {
-      node = new_lr_node(NT_DIV, node, parse_primary(*rest, rest));
+      node = new_lr_node(NT_DIV, node, parse_factor(*rest, rest));
       continue;
     }
 
     if (match("%", *rest, rest)) {
-      node = new_lr_node(NT_REM, node, parse_primary(*rest, rest));
+      node = new_lr_node(NT_REM, node, parse_factor(*rest, rest));
       continue;
     }
 
@@ -112,24 +162,24 @@ struct node *parse_term(char *input, char **rest) {
   }
 }
 
-// unary = ( "+" | "-" ) unary
+// factor = ( "+" | "-" ) factor
 //       | primary
-struct node *parse_unary(char *input, char **rest) {
+struct node *parse_factor(char *input, char **rest) {
   if (match("+", input, rest)) {
-    return parse_unary(*rest, rest);
+    return parse_factor(*rest, rest);
   }
 
   if (match("-", input, rest)) {
-    return new_l_node(NT_NEG, parse_unary(*rest, rest));
+    return new_l_node(NT_NEG, parse_factor(*rest, rest));
   }
 
   return parse_primary(input, rest);
 }
 
-// primary = "(" add ")" | i64
+// primary = "(" expr ")" | i64
 struct node *parse_primary(char *input, char **rest) {
   if (match("(", input, rest)) {
-    struct node *node = parse_sum(*rest, rest);
+    struct node *node = parse_expr(*rest, rest);
     if (!match(")", *rest, rest)) {
       error("expecting ')'");
     }
@@ -148,6 +198,10 @@ jit_value_t build_bin_sub(jit_function_t f, struct node *node);
 jit_value_t build_bin_mul(jit_function_t f, struct node *node);
 jit_value_t build_bin_div(jit_function_t f, struct node *node);
 jit_value_t build_bin_rem(jit_function_t f, struct node *node);
+jit_value_t build_bin_and(jit_function_t f, struct node *node);
+jit_value_t build_bin_sand(jit_function_t f, struct node *node);
+jit_value_t build_bin_or(jit_function_t f, struct node *node);
+jit_value_t build_bin_sor(jit_function_t f, struct node *node);
 jit_value_t build_expr(jit_function_t f, struct node *node);
 
 jit_value_t build_expr(jit_function_t f, struct node *node) {
@@ -166,6 +220,14 @@ jit_value_t build_expr(jit_function_t f, struct node *node) {
     return build_bin_div(f, node);
   case NT_REM:
     return build_bin_rem(f, node);
+  case NT_AND:
+    return build_bin_and(f, node);
+  case NT_SAND:
+    return build_bin_sand(f, node);
+  case NT_OR:
+    return build_bin_or(f, node);
+  case NT_SOR:
+    return build_bin_sor(f, node);
   }
 
   error("could not build expression\n");
@@ -202,13 +264,45 @@ jit_value_t build_bin_rem(jit_function_t f, struct node *node) {
   return jit_insn_rem(f, left, right);
 }
 
+jit_value_t build_bin_and(jit_function_t f, struct node *node) {
+  jit_value_t left = build_expr(f, node->left);
+  jit_value_t right = build_expr(f, node->right);
+  return jit_insn_and(f, left, right);
+}
+
+jit_value_t build_bin_sand(jit_function_t f, struct node *node) {
+  jit_value_t left = build_expr(f, node->left);
+  jit_value_t right = jit_value_create_nint_constant(f, jit_type_int, 0);
+  jit_label_t skip_right = jit_label_undefined;
+  jit_insn_branch_if_not(f, left, &skip_right);
+  right = build_expr(f, node->right);
+  jit_insn_label(f, &skip_right);
+  return jit_insn_and(f, left, right);
+}
+
+jit_value_t build_bin_or(jit_function_t f, struct node *node) {
+  jit_value_t left = build_expr(f, node->left);
+  jit_value_t right = build_expr(f, node->right);
+  return jit_insn_or(f, left, right);
+}
+
+jit_value_t build_bin_sor(jit_function_t f, struct node *node) {
+  jit_value_t left = build_expr(f, node->left);
+  jit_value_t right = jit_value_create_nint_constant(f, jit_type_int, 1);
+  jit_label_t skip_right = jit_label_undefined;
+  jit_insn_branch_if(f, left, &skip_right);
+  right = build_expr(f, node->right);
+  jit_insn_label(f, &skip_right);
+  return jit_insn_or(f, left, right);
+}
+
 int main(int argc, char **argv) {
   if (argc != 2) {
     printf("usage: %s <bee source code>\n", argv[0]);
   }
 
   char *program = argv[1];
-  struct node *node = parse_sum(program, &program);
+  struct node *node = parse_expr(program, &program);
 
   if (*program != '\0') {
     error("bytes remaining after end of program");
