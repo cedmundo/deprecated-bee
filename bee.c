@@ -17,6 +17,7 @@ enum node_type {
   NT_DIV,
   NT_REM,
   NT_NEG,
+  NT_NOT,
   NT_AND,
   NT_SAND,
   NT_OR,
@@ -209,7 +210,7 @@ struct node *parse_term(char *input, char **rest) {
   }
 }
 
-// factor = ( "+" | "-" ) factor
+// factor = ( "+" | "-" | "!" ) factor
 //       | primary
 struct node *parse_factor(char *input, char **rest) {
   if (match("+", input, rest)) {
@@ -218,6 +219,10 @@ struct node *parse_factor(char *input, char **rest) {
 
   if (match("-", input, rest)) {
     return new_l_node(NT_NEG, parse_factor(*rest, rest));
+  }
+
+  if (match("!", input, rest)) {
+    return new_l_node(NT_NOT, parse_factor(*rest, rest));
   }
 
   return parse_primary(input, rest);
@@ -263,6 +268,8 @@ jit_value_t build_expr(jit_function_t f, struct node *node) {
     return jit_value_create_nint_constant(f, jit_type_int, node->val_i64);
   case NT_NEG:
     return jit_insn_neg(f, build_expr(f, node->left));
+  case NT_NOT:
+    return jit_insn_not(f, build_expr(f, node->left));
   case NT_ADD:
     return build_bin_add(f, node);
   case NT_SUB:
