@@ -3,3 +3,4 @@ bin
 *.o
 lex.yy.c
 y.tab.*
+build
