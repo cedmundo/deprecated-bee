@@ -12,6 +12,9 @@
 enum node_type {
   NT_ADD,
   NT_SUB,
+  NT_MUL,
+  NT_DIV,
+  NT_REM,
   NT_I64,
 };
 
@@ -54,20 +57,45 @@ struct node *new_lr_node(enum node_type type, struct node *left,
 }
 
 struct node *parse_primary(char *input, char **rest);
+struct node *parse_term(char *input, char **rest);
 struct node *parse_sum(char *input, char **rest);
 
 // sum = primary ("+" primary | "-" primary)*
 struct node *parse_sum(char *input, char **rest) {
-  struct node *node = parse_primary(input, rest);
+  struct node *node = parse_term(input, rest);
 
   for (;;) {
     if (match("+", *rest, rest)) {
-      node = new_lr_node(NT_ADD, node, parse_primary(*rest, rest));
+      node = new_lr_node(NT_ADD, node, parse_term(*rest, rest));
       continue;
     }
 
     if (match("-", *rest, rest)) {
-      node = new_lr_node(NT_SUB, node, parse_primary(*rest, rest));
+      node = new_lr_node(NT_SUB, node, parse_term(*rest, rest));
+      continue;
+    }
+
+    return node;
+  }
+}
+
+// term = primary ("*" primary | "/" primary | "%" primary)*
+struct node *parse_term(char *input, char **rest) {
+  struct node *node = parse_primary(input, rest);
+
+  for (;;) {
+    if (match("*", *rest, rest)) {
+      node = new_lr_node(NT_MUL, node, parse_primary(*rest, rest));
+      continue;
+    }
+
+    if (match("/", *rest, rest)) {
+      node = new_lr_node(NT_DIV, node, parse_primary(*rest, rest));
+      continue;
+    }
+
+    if (match("%", *rest, rest)) {
+      node = new_lr_node(NT_REM, node, parse_primary(*rest, rest));
       continue;
     }
 
@@ -85,6 +113,9 @@ struct node *parse_primary(char *input, char **rest) {
 
 jit_value_t build_bin_add(jit_function_t f, struct node *node);
 jit_value_t build_bin_sub(jit_function_t f, struct node *node);
+jit_value_t build_bin_mul(jit_function_t f, struct node *node);
+jit_value_t build_bin_div(jit_function_t f, struct node *node);
+jit_value_t build_bin_rem(jit_function_t f, struct node *node);
 jit_value_t build_expr(jit_function_t f, struct node *node);
 
 jit_value_t build_expr(jit_function_t f, struct node *node) {
@@ -95,6 +126,12 @@ jit_value_t build_expr(jit_function_t f, struct node *node) {
     return build_bin_add(f, node);
   case NT_SUB:
     return build_bin_sub(f, node);
+  case NT_MUL:
+    return build_bin_mul(f, node);
+  case NT_DIV:
+    return build_bin_div(f, node);
+  case NT_REM:
+    return build_bin_rem(f, node);
   }
 
   error("could not build expression\n");
@@ -111,6 +148,24 @@ jit_value_t build_bin_sub(jit_function_t f, struct node *node) {
   jit_value_t left = build_expr(f, node->left);
   jit_value_t right = build_expr(f, node->right);
   return jit_insn_sub(f, left, right);
+}
+
+jit_value_t build_bin_mul(jit_function_t f, struct node *node) {
+  jit_value_t left = build_expr(f, node->left);
+  jit_value_t right = build_expr(f, node->right);
+  return jit_insn_mul(f, left, right);
+}
+
+jit_value_t build_bin_div(jit_function_t f, struct node *node) {
+  jit_value_t left = build_expr(f, node->left);
+  jit_value_t right = build_expr(f, node->right);
+  return jit_insn_div(f, left, right);
+}
+
+jit_value_t build_bin_rem(jit_function_t f, struct node *node) {
+  jit_value_t left = build_expr(f, node->left);
+  jit_value_t right = build_expr(f, node->right);
+  return jit_insn_rem(f, left, right);
 }
 
 int main(int argc, char **argv) {
