@@ -57,6 +57,7 @@ enum node_type {
   NT_GT,
   NT_GE,
   NT_I64,
+  NT_APPLY,
 };
 
 struct node {
@@ -67,7 +68,26 @@ struct node {
       struct node *right;
     };
     int64_t val_i64;
+    char *val_str;
   };
+};
+
+struct bind {
+  struct bind *next;
+  char *name;
+  jit_type_t type;
+  jit_value_t value;
+};
+
+struct scope {
+  jit_function_t func;
+  jit_type_t r_type;
+  jit_value_t r_value;
+
+  struct bind *binds;
+  struct scope *parent;
+  struct scope *sibling;
+  struct scope *children;
 };
 
 void error(struct token token, char *msg, ...) {
@@ -100,9 +120,9 @@ bool isdigit_with_notation(char v, enum notation n) {
 }
 
 bool iskeyword(char *v, size_t len) {
-  const char *keywords[] = {"module", "def",    "let",  "in",   "where",
-                            "with",   "lambda", "type", "of",   "match",
-                            "true",   "false",  "nil",  "unit", NULL};
+  const char *keywords[] = {
+      "module", "def",   "let",       "in",   "where", "with", "lambda", "type",
+      "of",     "match", "otherwise", "true", "false", "nil",  "unit",   NULL};
 
   for (int i = 0; keywords[i] != NULL; i++) {
     const char *keyword = keywords[i];
@@ -213,8 +233,9 @@ struct token next_token(struct token prev) {
     return token;
   }
 
-  if (!isspace(*cur) && !ispunct(*cur)) {
-    while (!isspace(*cur) && !ispunct(*cur) && *cur != '\0') {
+  if (!isspace(*cur) && (!ispunct(*cur) || *cur == '_' || *cur == '$')) {
+    while (!isspace(*cur) && (!ispunct(*cur) || *cur == '_' || *cur == '$') &&
+           *cur != '\0') {
       cur++;
       token.len++;
     }
@@ -283,6 +304,7 @@ struct node *parse_term(struct token *token);
 struct node *parse_factor(struct token *token);
 struct node *parse_primary(struct token *token);
 struct node *parse_literal(struct token *token);
+struct node *parse_apply(struct token *token);
 
 struct node *parse_expr(struct token *token) {
   return parse_rel(token);
@@ -432,10 +454,12 @@ struct node *parse_factor(struct token *token) {
   return parse_primary(token);
 }
 
-// primary = "(" expr ")" | literal
+// primary = "(" expr ")" | literal | apply
 struct node *parse_primary(struct token *token) {
+  struct node *node;
+
   if (match(token, TT_PUNCT, "(")) {
-    struct node *node = parse_expr(token);
+    node = parse_expr(token);
     if (!match(token, TT_PUNCT, ")")) {
       error(*token, "expected ')' found: %d", next_token(*token).type);
     }
@@ -443,7 +467,17 @@ struct node *parse_primary(struct token *token) {
     return node;
   }
 
-  return parse_literal(token);
+  node = parse_literal(token);
+  if (node != NULL) {
+    return node;
+  }
+
+  node = parse_apply(token);
+  if (node != NULL) {
+    return node;
+  }
+
+  return node;
 }
 
 // literal = int literal
@@ -464,178 +498,277 @@ struct node *parse_literal(struct token *token) {
     return node;
   }
 
-  error(*token, "expecting a literal, found: %d", next_token(*token).type);
+  return NULL;
+}
+
+struct node *parse_apply(struct token *token) {
+  if (match(token, TT_INDENT, NULL)) {
+    struct node *node = new_node();
+    node->val_str = calloc(sizeof(char), token->len + 1);
+    node->type = NT_APPLY;
+    memcpy(node->val_str, token->pos, token->len);
+    return node;
+  }
+
   return NULL;
 }
 
 // JIT & Running
 
-jit_value_t build_bin_add(jit_function_t f, struct node *node);
-jit_value_t build_bin_sub(jit_function_t f, struct node *node);
-jit_value_t build_bin_mul(jit_function_t f, struct node *node);
-jit_value_t build_bin_div(jit_function_t f, struct node *node);
-jit_value_t build_bin_rem(jit_function_t f, struct node *node);
-jit_value_t build_bin_and(jit_function_t f, struct node *node);
-jit_value_t build_bin_sand(jit_function_t f, struct node *node);
-jit_value_t build_bin_or(jit_function_t f, struct node *node);
-jit_value_t build_bin_sor(jit_function_t f, struct node *node);
-jit_value_t build_bin_xor(jit_function_t f, struct node *node);
-jit_value_t build_bin_eq(jit_function_t f, struct node *node);
-jit_value_t build_bin_ne(jit_function_t f, struct node *node);
-jit_value_t build_bin_le(jit_function_t f, struct node *node);
-jit_value_t build_bin_lt(jit_function_t f, struct node *node);
-jit_value_t build_bin_ge(jit_function_t f, struct node *node);
-jit_value_t build_bin_gt(jit_function_t f, struct node *node);
-jit_value_t build_expr(jit_function_t f, struct node *node);
+jit_value_t build_bin_add(struct scope *scope, struct node *node);
+jit_value_t build_bin_sub(struct scope *scope, struct node *node);
+jit_value_t build_bin_mul(struct scope *scope, struct node *node);
+jit_value_t build_bin_div(struct scope *scope, struct node *node);
+jit_value_t build_bin_rem(struct scope *scope, struct node *node);
+jit_value_t build_bin_and(struct scope *scope, struct node *node);
+jit_value_t build_bin_sand(struct scope *scope, struct node *node);
+jit_value_t build_bin_or(struct scope *scope, struct node *node);
+jit_value_t build_bin_sor(struct scope *scope, struct node *node);
+jit_value_t build_bin_xor(struct scope *scope, struct node *node);
+jit_value_t build_bin_eq(struct scope *scope, struct node *node);
+jit_value_t build_bin_ne(struct scope *scope, struct node *node);
+jit_value_t build_bin_le(struct scope *scope, struct node *node);
+jit_value_t build_bin_lt(struct scope *scope, struct node *node);
+jit_value_t build_bin_ge(struct scope *scope, struct node *node);
+jit_value_t build_bin_gt(struct scope *scope, struct node *node);
+jit_value_t build_apply(struct scope *scope, struct node *node);
+jit_value_t build_expr(struct scope *scope, struct node *node);
+struct scope *new_scope(jit_function_t func);
+struct scope *scope_fork(struct scope *parent);
+struct bind *scope_push_bind(struct scope *scope, char *name, jit_type_t type,
+                             jit_value_t value);
+struct bind *scope_find_bind(struct scope *scope, char *name);
 
-jit_value_t build_expr(jit_function_t f, struct node *node) {
+jit_value_t build_expr(struct scope *scope, struct node *node) {
   switch (node->type) {
   case NT_I64:
-    return jit_value_create_nint_constant(f, jit_type_int, node->val_i64);
+    return jit_value_create_nint_constant(scope->func, jit_type_int,
+                                          node->val_i64);
   case NT_NEG:
-    return jit_insn_neg(f, build_expr(f, node->left));
+    return jit_insn_neg(scope->func, build_expr(scope, node->left));
   case NT_NOT:
-    return jit_insn_not(f, build_expr(f, node->left));
+    return jit_insn_not(scope->func, build_expr(scope, node->left));
   case NT_ADD:
-    return build_bin_add(f, node);
+    return build_bin_add(scope, node);
   case NT_SUB:
-    return build_bin_sub(f, node);
+    return build_bin_sub(scope, node);
   case NT_MUL:
-    return build_bin_mul(f, node);
+    return build_bin_mul(scope, node);
   case NT_DIV:
-    return build_bin_div(f, node);
+    return build_bin_div(scope, node);
   case NT_REM:
-    return build_bin_rem(f, node);
+    return build_bin_rem(scope, node);
   case NT_AND:
-    return build_bin_and(f, node);
+    return build_bin_and(scope, node);
   case NT_SAND:
-    return build_bin_sand(f, node);
+    return build_bin_sand(scope, node);
   case NT_OR:
-    return build_bin_or(f, node);
+    return build_bin_or(scope, node);
   case NT_SOR:
-    return build_bin_sor(f, node);
+    return build_bin_sor(scope, node);
   case NT_XOR:
-    return build_bin_xor(f, node);
+    return build_bin_xor(scope, node);
   case NT_EQ:
-    return build_bin_eq(f, node);
+    return build_bin_eq(scope, node);
   case NT_NE:
-    return build_bin_ne(f, node);
+    return build_bin_ne(scope, node);
   case NT_LT:
-    return build_bin_lt(f, node);
+    return build_bin_lt(scope, node);
   case NT_LE:
-    return build_bin_le(f, node);
+    return build_bin_le(scope, node);
   case NT_GT:
-    return build_bin_gt(f, node);
+    return build_bin_gt(scope, node);
   case NT_GE:
-    return build_bin_ge(f, node);
+    return build_bin_ge(scope, node);
+  case NT_APPLY:
+    return build_apply(scope, node);
   }
 
   // error(token, "could not build expression");
   return NULL;
 }
 
-jit_value_t build_bin_add(jit_function_t f, struct node *node) {
-  jit_value_t left = build_expr(f, node->left);
-  jit_value_t right = build_expr(f, node->right);
-  return jit_insn_add(f, left, right);
+jit_value_t build_bin_add(struct scope *scope, struct node *node) {
+  jit_value_t left = build_expr(scope, node->left);
+  jit_value_t right = build_expr(scope, node->right);
+  return jit_insn_add(scope->func, left, right);
 }
 
-jit_value_t build_bin_sub(jit_function_t f, struct node *node) {
-  jit_value_t left = build_expr(f, node->left);
-  jit_value_t right = build_expr(f, node->right);
-  return jit_insn_sub(f, left, right);
+jit_value_t build_bin_sub(struct scope *scope, struct node *node) {
+  jit_value_t left = build_expr(scope, node->left);
+  jit_value_t right = build_expr(scope, node->right);
+  return jit_insn_sub(scope->func, left, right);
 }
 
-jit_value_t build_bin_mul(jit_function_t f, struct node *node) {
-  jit_value_t left = build_expr(f, node->left);
-  jit_value_t right = build_expr(f, node->right);
-  return jit_insn_mul(f, left, right);
+jit_value_t build_bin_mul(struct scope *scope, struct node *node) {
+  jit_value_t left = build_expr(scope, node->left);
+  jit_value_t right = build_expr(scope, node->right);
+  return jit_insn_mul(scope->func, left, right);
 }
 
-jit_value_t build_bin_div(jit_function_t f, struct node *node) {
-  jit_value_t left = build_expr(f, node->left);
-  jit_value_t right = build_expr(f, node->right);
-  return jit_insn_div(f, left, right);
+jit_value_t build_bin_div(struct scope *scope, struct node *node) {
+  jit_value_t left = build_expr(scope, node->left);
+  jit_value_t right = build_expr(scope, node->right);
+  return jit_insn_div(scope->func, left, right);
 }
 
-jit_value_t build_bin_rem(jit_function_t f, struct node *node) {
-  jit_value_t left = build_expr(f, node->left);
-  jit_value_t right = build_expr(f, node->right);
-  return jit_insn_rem(f, left, right);
+jit_value_t build_bin_rem(struct scope *scope, struct node *node) {
+  jit_value_t left = build_expr(scope, node->left);
+  jit_value_t right = build_expr(scope, node->right);
+  return jit_insn_rem(scope->func, left, right);
 }
 
-jit_value_t build_bin_and(jit_function_t f, struct node *node) {
-  jit_value_t left = build_expr(f, node->left);
-  jit_value_t right = build_expr(f, node->right);
-  return jit_insn_and(f, left, right);
+jit_value_t build_bin_and(struct scope *scope, struct node *node) {
+  jit_value_t left = build_expr(scope, node->left);
+  jit_value_t right = build_expr(scope, node->right);
+  return jit_insn_and(scope->func, left, right);
 }
 
-jit_value_t build_bin_sand(jit_function_t f, struct node *node) {
-  jit_value_t left = build_expr(f, node->left);
-  jit_value_t right = jit_value_create_nint_constant(f, jit_type_int, 0);
+jit_value_t build_bin_sand(struct scope *scope, struct node *node) {
+  jit_value_t left = build_expr(scope, node->left);
+  jit_value_t right =
+      jit_value_create_nint_constant(scope->func, jit_type_int, 0);
   jit_label_t skip_right = jit_label_undefined;
-  jit_insn_branch_if_not(f, left, &skip_right);
-  right = build_expr(f, node->right);
-  jit_insn_label(f, &skip_right);
-  return jit_insn_and(f, left, right);
+  jit_insn_branch_if_not(scope->func, left, &skip_right);
+  right = build_expr(scope, node->right);
+  jit_insn_label(scope->func, &skip_right);
+  return jit_insn_and(scope->func, left, right);
 }
 
-jit_value_t build_bin_or(jit_function_t f, struct node *node) {
-  jit_value_t left = build_expr(f, node->left);
-  jit_value_t right = build_expr(f, node->right);
-  return jit_insn_or(f, left, right);
+jit_value_t build_bin_or(struct scope *scope, struct node *node) {
+  jit_value_t left = build_expr(scope, node->left);
+  jit_value_t right = build_expr(scope, node->right);
+  return jit_insn_or(scope->func, left, right);
 }
 
-jit_value_t build_bin_sor(jit_function_t f, struct node *node) {
-  jit_value_t left = build_expr(f, node->left);
-  jit_value_t right = jit_value_create_nint_constant(f, jit_type_int, 1);
+jit_value_t build_bin_sor(struct scope *scope, struct node *node) {
+  jit_value_t left = build_expr(scope, node->left);
+  jit_value_t right =
+      jit_value_create_nint_constant(scope->func, jit_type_int, 1);
   jit_label_t skip_right = jit_label_undefined;
-  jit_insn_branch_if(f, left, &skip_right);
-  right = build_expr(f, node->right);
-  jit_insn_label(f, &skip_right);
-  return jit_insn_or(f, left, right);
+  jit_insn_branch_if(scope->func, left, &skip_right);
+  right = build_expr(scope, node->right);
+  jit_insn_label(scope->func, &skip_right);
+  return jit_insn_or(scope->func, left, right);
 }
 
-jit_value_t build_bin_xor(jit_function_t f, struct node *node) {
-  jit_value_t left = build_expr(f, node->left);
-  jit_value_t right = build_expr(f, node->right);
-  return jit_insn_xor(f, left, right);
+jit_value_t build_bin_xor(struct scope *scope, struct node *node) {
+  jit_value_t left = build_expr(scope, node->left);
+  jit_value_t right = build_expr(scope, node->right);
+  return jit_insn_xor(scope->func, left, right);
 }
 
-jit_value_t build_bin_eq(jit_function_t f, struct node *node) {
-  jit_value_t left = build_expr(f, node->left);
-  jit_value_t right = build_expr(f, node->right);
-  return jit_insn_eq(f, left, right);
+jit_value_t build_bin_eq(struct scope *scope, struct node *node) {
+  jit_value_t left = build_expr(scope, node->left);
+  jit_value_t right = build_expr(scope, node->right);
+  return jit_insn_eq(scope->func, left, right);
 }
 
-jit_value_t build_bin_ne(jit_function_t f, struct node *node) {
-  jit_value_t left = build_expr(f, node->left);
-  jit_value_t right = build_expr(f, node->right);
-  return jit_insn_ne(f, left, right);
+jit_value_t build_bin_ne(struct scope *scope, struct node *node) {
+  jit_value_t left = build_expr(scope, node->left);
+  jit_value_t right = build_expr(scope, node->right);
+  return jit_insn_ne(scope->func, left, right);
 }
 
-jit_value_t build_bin_le(jit_function_t f, struct node *node) {
-  jit_value_t left = build_expr(f, node->left);
-  jit_value_t right = build_expr(f, node->right);
-  return jit_insn_le(f, left, right);
+jit_value_t build_bin_le(struct scope *scope, struct node *node) {
+  jit_value_t left = build_expr(scope, node->left);
+  jit_value_t right = build_expr(scope, node->right);
+  return jit_insn_le(scope->func, left, right);
 }
 
-jit_value_t build_bin_lt(jit_function_t f, struct node *node) {
-  jit_value_t left = build_expr(f, node->left);
-  jit_value_t right = build_expr(f, node->right);
-  return jit_insn_lt(f, left, right);
+jit_value_t build_bin_lt(struct scope *scope, struct node *node) {
+  jit_value_t left = build_expr(scope, node->left);
+  jit_value_t right = build_expr(scope, node->right);
+  return jit_insn_lt(scope->func, left, right);
 }
 
-jit_value_t build_bin_ge(jit_function_t f, struct node *node) {
-  jit_value_t left = build_expr(f, node->left);
-  jit_value_t right = build_expr(f, node->right);
-  return jit_insn_ge(f, left, right);
+jit_value_t build_bin_ge(struct scope *scope, struct node *node) {
+  jit_value_t left = build_expr(scope, node->left);
+  jit_value_t right = build_expr(scope, node->right);
+  return jit_insn_ge(scope->func, left, right);
 }
 
-jit_value_t build_bin_gt(jit_function_t f, struct node *node) {
-  jit_value_t left = build_expr(f, node->left);
-  jit_value_t right = build_expr(f, node->right);
-  return jit_insn_gt(f, left, right);
+jit_value_t build_bin_gt(struct scope *scope, struct node *node) {
+  jit_value_t left = build_expr(scope, node->left);
+  jit_value_t right = build_expr(scope, node->right);
+  return jit_insn_gt(scope->func, left, right);
+}
+
+jit_value_t build_apply(struct scope *scope, struct node *node) {
+  struct bind *bind = scope_find_bind(scope, node->val_str);
+  if (bind == NULL) {
+    fprintf(stderr, "undefined: %s\n", node->val_str);
+    exit(1);
+  }
+
+  return jit_insn_load(scope->func, bind->value);
+}
+
+struct scope *new_scope(jit_function_t func) {
+  struct scope *scope = calloc(sizeof(struct scope), 1);
+  scope->func = func;
+  return scope;
+}
+
+struct scope *scope_fork(struct scope *parent) {
+  struct scope *scope = new_scope(parent->func);
+  scope->parent = parent;
+
+  if (parent->children == NULL) {
+    parent->children = scope;
+  } else {
+    struct scope *last = parent->children;
+    while (last->sibling != NULL) {
+      last = last->sibling;
+    }
+
+    last->sibling = scope;
+  }
+
+  return scope;
+}
+
+struct bind *scope_push_bind(struct scope *scope, char *name, jit_type_t type,
+                             jit_value_t value) {
+  jit_value_t dest = jit_value_create(scope->func, type);
+  jit_insn_store(scope->func, dest, value);
+
+  struct bind *bind = calloc(sizeof(struct bind), 1);
+  bind->name = name;
+  bind->type = type;
+  bind->value = dest;
+
+  if (scope->binds == NULL) {
+    scope->binds = bind;
+  } else {
+    struct bind *last = scope->binds;
+    while (last->next != NULL) {
+      last = last->next;
+    }
+
+    last->next = bind;
+  }
+
+  return bind;
+}
+
+struct bind *scope_find_bind(struct scope *scope, char *name) {
+  struct bind *cur = NULL;
+
+  while (scope != NULL) {
+    cur = scope->binds;
+    while (cur != NULL) {
+      if (strcmp(cur->name, name) == 0) {
+        break;
+      }
+
+      cur = cur->next;
+    }
+
+    scope = scope->parent;
+  }
+
+  return cur;
 }
 
 int main(int argc, char **argv) {
@@ -659,8 +792,12 @@ int main(int argc, char **argv) {
   jit_type_t main_signature =
       jit_type_create_signature(jit_abi_cdecl, jit_type_int, NULL, 0, 1);
   jit_function_t main = jit_function_create(context, main_signature);
-  jit_insn_return(main, build_expr(main, node));
 
+  struct scope *main_scope = new_scope(main);
+  jit_value_t main_id = jit_value_create_nint_constant(main, jit_type_int, 0x2);
+  scope_push_bind(main_scope, "_bee_build_version$", jit_type_int, main_id);
+
+  jit_insn_return(main, build_expr(main_scope, node));
   jit_function_compile(main);
 
   jit_int result;

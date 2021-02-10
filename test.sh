@@ -91,5 +91,7 @@ assert "-0xFF" "-255"
 assert "0b10" "2"
 assert "0o70" "56"
 
+assert "_bee_build_version$" "2"
+
 { set +x; } 2>/dev/null;
 echo "ALL PASSED"
