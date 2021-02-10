@@ -86,5 +86,10 @@ assert "~0" "-1" # Not applied to 64-bit integer
 assert "1 + 1" "2"
 assert "2 * 2 + 3" "7"
 
+assert "0xFF" "255"
+assert "-0xFF" "-255"
+assert "0b10" "2"
+assert "0o70" "56"
+
 { set +x; } 2>/dev/null;
 echo "ALL PASSED"
