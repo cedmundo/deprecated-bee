@@ -7,7 +7,7 @@ assert() {
   PROGRAM="$1";
   EXPECTED="$2";
 
-  RESULT=$($BEE "$PROGRAM" 2>&1);
+  RESULT=$($BEE "$PROGRAM" 2>&1 | sed -e 's/^[[:space:]]*//');
   if [ "$RESULT" != "$EXPECTED" ]; then
       echo "FAIL: result \"$RESULT\" != expected \"$EXPECTED\" on program:
         $PROGRAM";
@@ -92,6 +92,7 @@ assert "0b10" "2"
 assert "0o70" "56"
 
 assert "_bee_build_version$" "2"
+assert "bad" "undefined: bad"
 
 { set +x; } 2>/dev/null;
 echo "ALL PASSED"
