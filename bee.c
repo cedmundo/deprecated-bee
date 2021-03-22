@@ -120,9 +120,10 @@ bool isdigit_with_notation(char v, enum notation n) {
 }
 
 bool iskeyword(char *v, size_t len) {
-  const char *keywords[] = {
-      "module", "def",   "let",       "in",   "where", "with", "lambda", "type",
-      "of",     "match", "otherwise", "true", "false", "nil",  "unit",   NULL};
+  const char *keywords[] = {"module", "import",   "let",       "in",    "where",
+                            "with",   "mutation", "lambda",    "using", "type",
+                            "of",     "match",    "otherwise", "true",  "false",
+                            "nil",    "unit",     NULL};
 
   for (int i = 0; keywords[i] != NULL; i++) {
     const char *keyword = keywords[i];
@@ -781,30 +782,55 @@ int main(int argc, char **argv) {
   struct token start = {
       .col = 0, .row = 1, .len = 0, .type = TT_EOF, .pos = program};
 
-  struct node *node = parse_expr(&start);
-  if (next_token(start).type != TT_EOF) {
-    error(start, "remaining bytes after parsing");
-  }
+  do {
+    start = next_token(start);
+    switch (start.type) {
+    case TT_EOF:
+      printf("EOF\n");
+      break;
+    case TT_PUNCT:
+      printf("PUNCT\n");
+      break;
+    case TT_NUMBER:
+      printf("NUMBER\n");
+      break;
+    case TT_STRING:
+      printf("STRING\n");
+      break;
+    case TT_KEYWORD:
+      printf("KEYWORD\n");
+      break;
+    case TT_INDENT:
+      printf("INDENTIFIER\n");
+      break;
+    }
+  } while (start.type != TT_EOF);
 
-  jit_context_t context = jit_context_create();
-  jit_context_build_start(context);
+  // struct node *node = parse_expr(&start);
+  // if (next_token(start).type != TT_EOF) {
+  //   error(start, "remaining bytes after parsing");
+  // }
 
-  jit_type_t main_signature =
-      jit_type_create_signature(jit_abi_cdecl, jit_type_int, NULL, 0, 1);
-  jit_function_t main = jit_function_create(context, main_signature);
+  // jit_context_t context = jit_context_create();
+  // jit_context_build_start(context);
 
-  struct scope *main_scope = new_scope(main);
-  jit_value_t main_id = jit_value_create_nint_constant(main, jit_type_int, 0x2);
-  scope_push_bind(main_scope, "_bee_build_version$", jit_type_int, main_id);
+  // jit_type_t main_signature =
+  //     jit_type_create_signature(jit_abi_cdecl, jit_type_int, NULL, 0, 1);
+  // jit_function_t main = jit_function_create(context, main_signature);
 
-  jit_insn_return(main, build_expr(main_scope, node));
-  jit_function_compile(main);
+  // struct scope *main_scope = new_scope(main);
+  // jit_value_t main_id = jit_value_create_nint_constant(main, jit_type_int,
+  // 0x2); scope_push_bind(main_scope, "_bee_build_version$", jit_type_int,
+  // main_id);
 
-  jit_int result;
-  jit_function_apply(main, NULL, &result);
-  printf("%d", result);
+  // jit_insn_return(main, build_expr(main_scope, node));
+  // jit_function_compile(main);
 
-  jit_context_build_end(context);
-  jit_context_destroy(context);
+  // jit_int result;
+  // jit_function_apply(main, NULL, &result);
+  // printf("%d", result);
+
+  // jit_context_build_end(context);
+  // jit_context_destroy(context);
   return 0;
 }
