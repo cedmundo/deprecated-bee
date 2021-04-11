@@ -150,6 +150,11 @@ struct bee_token bee_next_token(struct bee_token prev) {
     return token;
   }
 
+  // TODO:
+  //  - Emit EOL when '\n' or ';' is reached and not skipped
+  //  - Don't emit EOL when token between '(' and ')' or '[' and
+  //  ']'
+
   // If required, emit an INDENT or a DEDENT instead
   if (start_endl) {
     char *tmp = cur + 1;
