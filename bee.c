@@ -76,8 +76,10 @@ void bee_highlight_push(struct bee_highlight *root, const char *sequence) {
 }
 
 struct bee_highlight *bee_builtin_operators() {
-  const char *defaults[] = {"(", ")", "[",  "]",  "{", "}",
-                            ":", "=", "==", "=>", NULL};
+  const char *defaults[] = {
+      "(", ")", "[",  "]",  "{", "}",  ":",  "=",  "=>", "->",
+      "+", "-", "*",  "/",  "%", "&",  "&&", "|",  "||", "^",
+      "~", "!", "==", "!=", ">", ">=", "<",  "<=", ",",  NULL};
   struct bee_highlight root = {.next = NULL, .sequence = NULL};
 
   for (int32_t i = 0; defaults[i] != NULL; i++) {
@@ -88,7 +90,8 @@ struct bee_highlight *bee_builtin_operators() {
 }
 
 struct bee_highlight *bee_builtin_keywords() {
-  const char *defaults[] = {"match", "with", "unmatched", NULL};
+  const char *defaults[] = {"match",   "with",   "unmatched",
+                            "private", "module", NULL};
   struct bee_highlight root = {.next = NULL, .sequence = NULL};
 
   for (int32_t i = 0; defaults[i] != NULL; i++) {
@@ -285,5 +288,6 @@ int main(int argc, char **argv) {
   } while (token.type != BEE_TT_EOF);
 
   bee_highlights_free(token.operators);
+  bee_highlights_free(token.keywords);
   return 0;
 }
