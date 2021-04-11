@@ -152,8 +152,9 @@ struct bee_token bee_next_token(struct bee_token prev) {
 
   // TODO:
   //  - Emit EOL when '\n' or ';' is reached and not skipped
-  //  - Don't emit EOL when token between '(' and ')' or '[' and
-  //  ']'
+  //  - Don't emit EOL when token between '(' and ')' or '[' and ']'
+  // FIXME:
+  //  - When using INDENT or DEDENT it appears that current row is screwed
 
   // If required, emit an INDENT or a DEDENT instead
   if (start_endl) {
